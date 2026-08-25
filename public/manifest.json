@@ -1,0 +1,52 @@
+{
+  "name": "LWSRHP - LOVEWORLD SINGERS REHEARSAL HUB PORTAL",
+  "short_name": "LWSRHP",
+  "description": "LoveWorld Singers Rehearsal Hub - Comprehensive Digital Rehearsal app",
+  "version": "2.2.0",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "minimal-ui",
+  "orientation": "portrait",
+  "display_override": ["minimal-ui", "standalone"],
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/APP ICON/pwa_192_filled.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/APP ICON/pwa_512_filled.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/APP ICON/pwa_192_maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/APP ICON/pwa_512_maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["music", "entertainment", "lifestyle", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "screenshots": [
+    {
+      "src": "/images/home.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide"
+    }
+  ]
+}

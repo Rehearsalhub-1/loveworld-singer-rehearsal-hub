@@ -1,0 +1,259 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import SharedDrawer from '@/components/SharedDrawer';
+import { getMenuItems } from '@/config/menuItems';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  MessageCircle,
+  Send,
+  Paperclip,
+  Clock,
+  ArrowLeft,
+  Info,
+  ChevronLeft
+} from 'lucide-react';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { HQ_ADMIN_EMAILS } from '@/config/roles';
+
+import { BackendAPI } from '@/lib/api-client';
+const DataService = {
+  subscribeToChatMessages: (_id: string, cb: any) => { cb([]); return () => {}; },
+  sendChatMessage: async (data: any) => await BackendAPI.generic.create('support_chat', data)
+};
+
+import type { UserProfile } from '@/types/supabase';
+import { apiClient } from '@/lib/api-client';
+
+interface ChatMessage {
+  id: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  senderType: 'user' | 'admin';
+  timestamp: any;
+  isCurrentUser: boolean;
+}
+
+export default function ChatSupportPage() {
+  const router = useRouter();
+  const { user, profile, signOut } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [adminProfiles, setAdminProfiles] = useState<UserProfile[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const currentUser = {
+    id: user?.id || 'support-user-123',
+    name: profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : ((user as any)?.name || user?.email || "User") || 'Singer'
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Fetch Admin Profiles for Header
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const res = await apiClient.get<{ data?: UserProfile[] }>('/profiles/directory');
+        const rows = Array.isArray(res.data) ? res.data : [];
+        const admins = rows
+          .filter((row): row is UserProfile => !!row && typeof row === 'object')
+          .slice(0, 3);
+        setAdminProfiles(admins);
+      } catch (err) {
+        console.error("Error fetching admin profiles:", err);
+        setAdminProfiles([]);
+      }
+    };
+    fetchAdmins();
+  }, []);
+
+  const sendMessage = async () => {
+    if (newMessage.trim() === '' || !user?.id) return;
+
+    const textToSend = newMessage;
+    setNewMessage('');
+
+    console.warn('[migration] support/chat/page.tsx: sendMessage — no JWT API route yet');
+    void textToSend;
+    void currentUser;
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col">
+      {/* SaaS Style Header */}
+      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors active:scale-90"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-600" />
+          </button>
+
+          <div className="flex -space-x-2">
+            {adminProfiles.length > 0 ? (
+              adminProfiles.map((admin) => (
+                <div key={admin.id} className="w-8 h-8 rounded-full border-2 border-white bg-indigo-100 flex items-center justify-center overflow-hidden shadow-sm">
+                  {admin.profile_image_url || admin.avatar_url ? (
+                    <img
+                      src={admin.profile_image_url || admin.avatar_url || ''}
+                      alt="Support Team"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-indigo-600 bg-indigo-50">
+                      {(admin.first_name?.[0] || 'A').toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              [1, 2, 3].map((i) => (
+                <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-indigo-100 flex items-center justify-center overflow-hidden">
+                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + 10}`} alt="Support" className="w-full h-full object-cover" />
+                </div>
+              ))
+            )}
+          </div>
+
+          <div>
+            <h1 className="text-sm font-bold text-slate-900 leading-tight">Support Team</h1>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Typically replies in 10m</p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsMenuOpen(true)}
+          className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+        >
+          <div className="w-5 h-5 flex flex-col justify-center gap-0.5">
+            <span className="w-full h-0.5 bg-slate-600 rounded-full"></span>
+            <span className="w-full h-0.5 bg-slate-600 rounded-full"></span>
+            <span className="w-2/3 h-0.5 bg-slate-600 rounded-full ml-auto"></span>
+          </div>
+        </button>
+      </div>
+
+      {/* Modern Conversation Area */}
+      <div className="flex-1 overflow-y-auto pt-4 pb-20 px-4 scroll-smooth" style={{ scrollbarWidth: 'none' }}>
+        <div className="max-w-2xl mx-auto space-y-6">
+
+          {/* Welcome Message Card */}
+          {messages.length === 0 && !loading && (
+            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm text-center my-8">
+              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-indigo-600" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 mb-2">How can we help?</h2>
+              <p className="text-sm text-slate-500 leading-relaxed px-4">
+                Ask the support team anything about the app or your account. Our team is ready to assist you.
+              </p>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin"></div>
+              <p className="text-xs text-slate-400 font-medium">Connecting to support...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((message, idx) => {
+                const isSystem = message.senderType === 'admin';
+                const showAvatar = idx === 0 || messages[idx - 1]?.senderType !== message.senderType;
+
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex items-end gap-2 ${message.isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {!message.isCurrentUser && showAvatar && (
+                      <div className="w-7 h-7 rounded-full bg-indigo-100 flex-shrink-0 mb-1 overflow-hidden border border-slate-200 shadow-sm">
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=admin`} alt="A" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    {!message.isCurrentUser && !showAvatar && <div className="w-7"></div>}
+
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm transition-all ${message.isCurrentUser
+                        ? 'bg-indigo-600 text-white rounded-br-sm'
+                        : 'bg-white text-slate-800 rounded-bl-sm border border-slate-100'
+                        }`}
+                    >
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                      <div className={`flex items-center justify-end mt-1 opacity-60`}>
+                        <span className="text-[9px] font-medium uppercase tracking-tighter">
+                          {message.timestamp?.toDate ?
+                            message.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                            'Syncing...'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Slick SaaS Input Bar */}
+      <div className="bg-white/80 backdrop-blur-xl border-t border-slate-200 p-4 pb-8 sticky bottom-0 z-50">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2 flex items-center gap-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/50 transition-all shadow-inner">
+            <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+              <Paperclip className="w-5 h-5" />
+            </button>
+            <textarea
+              rows={1}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Send us a message..."
+              className="flex-1 bg-transparent py-2 px-1 text-sm text-slate-800 placeholder-slate-400 focus:outline-none resize-none max-h-32"
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = `${target.scrollHeight}px`;
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!newMessage.trim()}
+              className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center hover:bg-indigo-700 transition-all disabled:opacity-30 disabled:grayscale active:scale-90 shadow-md shadow-indigo-200"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-[9px] text-center text-slate-400 mt-2 font-medium flex items-center justify-center gap-1 uppercase tracking-widest">
+            <Info className="w-2.5 h-2.5" />
+            End-to-end encrypted support
+          </p>
+        </div>
+      </div>
+
+      <SharedDrawer
+        open={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        items={getMenuItems(() => signOut())}
+      />
+    </div>
+  );
+}

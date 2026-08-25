@@ -1,0 +1,1098 @@
+@import "tailwindcss";
+
+/* Enhanced safe area variables */
+:root {
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --enhanced-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+}
+
+/* 🟣 ACTIVE SONG - Blinking Purple Border Animation */
+@keyframes pulse-ring {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 92, 242, 0.7), 0 0 20px rgba(192, 92, 242, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(192, 92, 242, 0), 0 0 30px rgba(192, 92, 242, 0.5);
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes message-highlight {
+  0% { background-color: rgba(16, 185, 129, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.animate-message-highlight {
+  animation: message-highlight 2s ease-out forwards;
+}
+
+/* 🟣 ACTIVE CATEGORY - Blinking Purple Badge */
+@keyframes pulse-badge {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 92, 242, 0.6), 0 0 10px rgba(192, 92, 242, 0.3);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(192, 92, 242, 0), 0 0 15px rgba(192, 92, 242, 0.5);
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-badge {
+  animation: pulse-badge 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ✅ INSTANT RENDERING - Critical CSS First */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
+  /* ✅ Instant paint */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+  height: 100%;
+  overflow: hidden;
+  /* ✅ Enhanced touch responsiveness */
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: pan-x pan-y;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #F0F4F3 0%, #D8E0DE 100%);
+  /* ✅ Instant rendering */
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Mobile Safe Area Support */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+}
+
+/* Mobile viewport height fix - ensures full screen height like native apps */
+.mobile-vh {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: calc(var(--vh, 1vh) * 100);
+  max-height: 100vh;
+  max-height: 100dvh;
+  max-height: calc(var(--vh, 1vh) * 100);
+}
+
+/* Safe area bottom padding */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+}
+
+/* Fixed bottom elements with safe area */
+.fixed-bottom-safe {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  /* Enhanced safe area support for modern devices */
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  /* Additional support for devices with home indicators */
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+}
+
+/* Native app-style bottom input areas */
+.bottom-input-safe {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  z-index: 50;
+}
+
+/* Enhanced bottom navigation for different devices */
+.bottom-nav-safe {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  z-index: 50;
+}
+
+/* Enhanced safe area support for different screen sizes */
+.safe-area-bottom-enhanced {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--enhanced-safe-area-bottom, 24px));
+}
+
+/* Enhanced bottom bar with better device support */
+.bottom-bar-enhanced {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  /* High z-index to ensure it's above all content */
+  z-index: 100 !important;
+  /* Use CSS custom properties for dynamic safe area */
+  padding-bottom: var(--enhanced-safe-area-bottom, 24px);
+  /* Ensure content is not cut off */
+  min-height: 60px;
+  /* Better touch target */
+  touch-action: manipulation;
+  /* Ensure pointer events work */
+  pointer-events: auto;
+}
+
+/* Device-specific enhancements */
+.has-safe-area .bottom-bar-enhanced {
+  padding-bottom: var(--enhanced-safe-area-bottom, 24px);
+}
+
+.no-safe-area .bottom-bar-enhanced {
+  padding-bottom: 24px;
+}
+
+/* For content that needs extra bottom spacing on mobile */
+.content-bottom-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 80px);
+}
+
+/* For modals and overlays */
+.modal-bottom-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--enhanced-safe-area-bottom, 32px));
+}
+
+/* Device-specific safe area adjustments */
+/* iPhone with home indicator */
+@supports (padding: max(0px)) {
+  .bottom-input-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--input-safe-area-bottom, 20px));
+  }
+
+  .bottom-nav-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--nav-safe-area-bottom, 24px));
+  }
+
+  .fixed-bottom-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  }
+}
+
+/* iPhone specific adjustments */
+.device-iphone .bottom-input-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--input-safe-area-bottom, 20px));
+}
+
+.device-iphone .bottom-nav-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--nav-safe-area-bottom, 24px));
+}
+
+/* iPhone with home indicator */
+.device-iphone.has-home-indicator .bottom-input-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+}
+
+.device-iphone.has-home-indicator .bottom-nav-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+}
+
+/* Android devices with navigation bar */
+.device-android .bottom-input-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--input-safe-area-bottom, 24px));
+}
+
+.device-android .bottom-nav-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--nav-safe-area-bottom, 28px));
+}
+
+@media screen and (max-width: 768px) {
+  .bottom-input-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--input-safe-area-bottom, 24px));
+  }
+
+  .bottom-nav-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--nav-safe-area-bottom, 28px));
+  }
+}
+
+/* Small screens */
+@media (max-height: 600px) {
+  .safe-area-bottom-enhanced {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 28px);
+  }
+
+  .modal-bottom-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 36px);
+  }
+
+  .bottom-input-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  }
+
+  .bottom-nav-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  }
+}
+
+/* Very small screens */
+@media (max-height: 500px) {
+  .safe-area-bottom-enhanced {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 32px);
+  }
+
+  .modal-bottom-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 40px);
+  }
+
+  .content-bottom-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 100px);
+  }
+
+  .bottom-input-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  }
+
+  .bottom-nav-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 28px);
+  }
+}
+
+/* Mobile-optimized container */
+.mobile-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: calc(var(--vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Content area with bottom spacing - accounts for fixed bottom bars */
+.mobile-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+}
+
+/* Scrollable content with fixed bottom navigation - like native apps */
+.mobile-content-with-bottom-nav {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Account for fixed bottom category bar (~84px) + safe area + extra buffer */
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 140px);
+}
+
+/* Small screen optimizations */
+@media (max-height: 600px) {
+  .mobile-vh {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .fixed-bottom-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  }
+}
+
+/* iOS Blur Effect */
+.ios-blur {
+  background-color: rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Enhanced Touch Targets */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"] {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom Scrollbar Styles */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+}
+
+.scrollbar-track-gray-100::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+
+:root {
+  --background: #ffffff;
+  --foreground: #64748b;
+  --card: #ffffff;
+  --card-foreground: #64748b;
+  --popover: #ffffff;
+  --popover-foreground: #64748b;
+  --primary: #6366f1;
+  --primary-foreground: #fafafa;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #64748b;
+  --muted: #f5f5f5;
+  --muted-foreground: #94a3b8;
+  --accent: #f5f5f5;
+  --accent-foreground: #64748b;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #6366f1;
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  --font-display: var(--font-outfit), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: var(--font-outfit), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-ios: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #f8fafc;
+    --foreground: #64748b;
+    --card: #ffffff;
+    --card-foreground: #64748b;
+    --popover: #ffffff;
+    --popover-foreground: #64748b;
+    --primary: #6366f1;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #64748b;
+    --muted: #f1f5f9;
+    --muted-foreground: #94a3b8;
+    --accent: #f1f5f9;
+    --accent-foreground: #64748b;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #6366f1;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Beautiful Typography System */
+
+/* System fonts for faster loading */
+.font-poppins {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.font-poppins-light {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+
+.font-poppins-medium {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.font-poppins-semibold {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.font-poppins-bold {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* System fonts for headings */
+.font-outfit {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.font-outfit-light {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.font-outfit-medium {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.font-outfit-semibold {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.font-outfit-bold {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.font-outfit-extrabold {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* iOS-style system fonts */
+.font-ios {
+  font-family: var(--font-ios);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.font-ios-medium {
+  font-family: var(--font-ios);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.font-ios-semibold {
+  font-family: var(--font-ios);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Legacy support for existing classes */
+.font-display {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.font-display-light {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.font-display-medium {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.font-display-bold {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Mobile-first responsive improvements */
+@media (max-width: 640px) {
+
+  /* Improve touch targets */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    min-width: 44px;
+    /* ✅ Enhanced touch responsiveness */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  /* Better spacing for mobile */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Prevent horizontal scroll */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Improve readability */
+  p,
+  span,
+  div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* ✅ Enhanced touch responsiveness for all interactive elements */
+  [role="button"],
+  .cursor-pointer,
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* ✅ Remove touch delays */
+  * {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    touch-action: manipulation;
+  }
+}
+
+/* Tablet improvements */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Mobile-first optimizations */
+.mobile-optimized {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Touch-friendly buttons */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  /* ✅ Enhanced touch responsiveness */
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ✅ Ultra-responsive touch targets */
+.touch-optimized {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  /* Remove any transition delays */
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ✅ Instant touch response */
+.touch-instant {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Remove all delays */
+  transition: none !important;
+  animation: none !important;
+  /* Force hardware acceleration */
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Mobile viewport fixes */
+@supports (-webkit-touch-callout: none) {
+  .mobile-optimized {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Auto-scroll for category bars */
+.category-auto-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
+  /* Enhanced smoothness */
+  will-change: scroll-position;
+  transform: translateZ(0);
+  /* Force hardware acceleration */
+  backface-visibility: hidden;
+}
+
+.category-auto-scroll::-webkit-scrollbar {
+  display: none;
+  /* WebKit */
+}
+
+/* Auto-scroll animation for category buttons */
+@keyframes auto-scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(-20px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.category-auto-scroll:hover {
+  animation: auto-scroll 2s ease-in-out infinite;
+}
+
+/* Smooth scroll for category containers */
+.category-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  /* Enhanced performance for smooth scrolling */
+  will-change: scroll-position;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Optimize for 60fps */
+  contain: layout style paint;
+}
+
+.category-container::-webkit-scrollbar {
+  display: none;
+}
+
+.category-button {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  /* Prevent layout shifts during scroll */
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Prevent zoom on input focus */
+@media screen and (max-width: 768px) {
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Remove all focus outlines and borders */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+a:focus,
+button:active,
+input:active,
+select:active,
+textarea:active,
+a:active {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove all button outlines and borders */
+button {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove all input outlines and borders */
+input,
+textarea,
+select {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove all link outlines */
+a {
+  outline: none !important;
+  text-decoration: none !important;
+}
+
+/* Album Art Breathing Animation */
+@keyframes pulse-gentle {
+
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.15), 0 15px 20px -5px rgba(0, 0, 0, 0.08), 0 0 30px rgba(147, 51, 234, 0.2);
+  }
+}
+
+.animate-pulse-gentle {
+  animation: pulse-gentle 3s ease-in-out infinite;
+}
+
+/* FAB Button Running Breath Animation */
+@keyframes fabBreathe {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 15px #9333ea, 0 0 30px #9333ea, 0 0 45px #9333ea;
+    filter: drop-shadow(0 0 6px #9333ea);
+  }
+
+  25% {
+    transform: scale(1.08);
+    box-shadow: 0 0 25px #a855f7, 0 0 50px #a855f7, 0 0 75px #a855f7;
+    filter: drop-shadow(0 0 10px #a855f7);
+  }
+
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 0 35px #c084fc, 0 0 70px #c084fc, 0 0 105px #c084fc;
+    filter: drop-shadow(0 0 14px #c084fc);
+  }
+
+  75% {
+    transform: scale(1.08);
+    box-shadow: 0 0 25px #a855f7, 0 0 50px #a855f7, 0 0 75px #a855f7;
+    filter: drop-shadow(0 0 10px #a855f7);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px #9333ea, 0 0 30px #9333ea, 0 0 45px #9333ea;
+    filter: drop-shadow(0 0 6px #9333ea);
+  }
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide,
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* Internet Explorer 10+ */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  /* Safari and Chrome */
+}
+
+/* Custom animations for chat */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out;
+}
+
+
+/* ============================================ */
+/* CHAT ANIMATIONS - UI/UX Improvements */
+/* ============================================ */
+
+/* Message slide in animations */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Slide up animation for modals */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Bounce animation for scroll button */
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounce 2s infinite;
+}
+
+/* Pulse animation for loading */
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Typing indicator bounce */
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+/* Scale animation for buttons */
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* Rotate animation for phone icon */
+.rotate-135 {
+  transform: rotate(135deg);
+}
+
+/* Smooth transitions */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+.transition-colors {
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.transition-transform {
+  transition: transform 0.2s ease;
+}
+
+/* ============================================ */
+/* END CHAT ANIMATIONS */
+/* ============================================ */
+
+/* ============================================ */
+/* VIRTUAL KEYBOARD ACTIVE FIXES (MOBILE WEB) */
+/* ============================================ */
+
+/* Automatically hide fixed bottom bars, floating navigation, and FABs when virtual keyboard is open on mobile */
+html.keyboard-open .bottom-tab-bar,
+html.keyboard-open .floating-category-bar,
+html.keyboard-open .mobile-bottom-nav,
+html.keyboard-open .fixed-bottom-tray,
+html.keyboard-open .bottom-bar-enhanced,
+html.keyboard-open .bottom-nav-safe,
+html.keyboard-open .bottom-input-safe,
+html.keyboard-open .fixed-bottom-safe,
+html.keyboard-open [style*="bottom: 0"],
+html.keyboard-open [style*="bottom:0"],
+html.keyboard-open .sticky.bottom-0,
+html.keyboard-open .fixed.bottom-0 {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Ensure active chat input bars or modal inputs stay visible and are pushed up correctly */
+html.keyboard-open .chat-input-container,
+html.keyboard-open .modal-content-container,
+html.keyboard-open .force-keyboard-visible {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  bottom: auto !important;
+  z-index: 99999 !important;
+}
+
+/* Ensure body remains scrollable to reach focused input */
+html.keyboard-open body {
+  overflow-y: auto !important;
+  height: auto !important;
+  min-height: 100vh !important;
+}
