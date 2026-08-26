@@ -155,7 +155,6 @@ function AuthPageContent() {
       }>('/auth/kingschat-login', {
         accessToken: authTokens.accessToken,
         kingschatUserId: kcProfile?.userId,
-        email: kcProfile?.email,
         profile: kcProfile,
       });
 
@@ -224,6 +223,7 @@ function AuthPageContent() {
         error?: string;
       }>('/auth/kingschat-login', {
         accessToken: savedKcAuth.accessToken,
+        selectedEmail: targetEmail,
         email: targetEmail,
         kingschatUserId: savedKcAuth.kingschatUserId,
         profile: savedKcAuth.profile,
