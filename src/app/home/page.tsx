@@ -273,12 +273,20 @@ function HomePageContent() {
   ]
 
   if (zoneLoading && !currentZone) {
-    return null;
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
+        <CustomLoader message="Loading Rehearsal Hub..." />
+      </div>
+    );
   }
 
   if (!zoneLoading && !currentZone && user && initialLoadComplete) {
     if (isRetrying || retryCount < 2) {
-      return null;
+      return (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
+          <CustomLoader message="Connecting to your choir zone..." />
+        </div>
+      );
     }
 
     return (

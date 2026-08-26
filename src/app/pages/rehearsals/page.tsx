@@ -150,20 +150,18 @@ export default function RehearsalsPage() {
       }] : []),
       ...(!hiddenFeatures.hideSubgroups ? [{
         id: 'subgroups',
-        title: 'Sub-Groups',
-        description: 'Access your church choir or campus fellowship rehearsal hub',
+        title: 'Church',
+        description: 'Access your church choir or fellowship rehearsal hub',
         icon: Users,
-        href: memberSubGroups.length > 0 
-          ? '/pages/subgroups' 
-          : '/pages/profile?tab=subgroups',
+        href: '/pages/praise-night?category=church',
         gradient: 'from-orange-600 via-amber-600 to-yellow-600',
         iconBg: 'bg-orange-100',
         iconColor: 'text-orange-600'
       }] : []),
       ...(isSubGroupCoordinator ? [{
         id: 'subgroup-admin',
-        title: 'Subgroup Admin',
-        description: 'Manage your subgroup songs, members, and rehearsals',
+        title: 'Church Admin',
+        description: 'Manage your church choir songs, members, and rehearsals',
         icon: Shield,
         href: '/subgroup-admin',
         gradient: 'from-indigo-600 via-violet-600 to-purple-600',

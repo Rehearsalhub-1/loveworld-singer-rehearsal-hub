@@ -1430,13 +1430,14 @@ function MemberManagementDrawer({
                       onChange={e => setEditForm(p => ({
                         ...p,
                         role: e.target.value,
-                        has_hq_access: e.target.value === 'hq_admin'
+                        has_hq_access: e.target.value === 'hq_admin' || e.target.value === 'super_admin'
                       }))}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                     >
-                      <option value="member">Singers (Standard Portal Access)</option>
-                      <option value="zone_admin">Zonal Director / Admin</option>
-                      <option value="hq_admin">Global HQ Executive (Full Scope)</option>
+                      <option value="member">Singer (Standard Portal Access)</option>
+                      <option value="church_coordinator">Church Coordinator (Subgroup / Assembly Lead)</option>
+                      <option value="zone_coordinator">Zonal Coordinator (Regional Zone Lead)</option>
+                      <option value="hq_admin">HQ Admin (Global Executive Access)</option>
                     </select>
                   </div>
                 ) : (
@@ -1446,7 +1447,7 @@ function MemberManagementDrawer({
                       <p className="text-[11px] text-slate-400 capitalize">{member.role || 'Singer'}</p>
                     </div>
                     <span className="px-3 py-1 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700">
-                      {member.role === 'hq_admin' ? 'HQ Admin' : member.role === 'zone_admin' ? 'Zone Director' : 'Choir Member'}
+                      {member.role === 'hq_admin' ? 'HQ Admin' : member.role === 'church_coordinator' ? 'Church Coordinator' : member.role === 'zone_admin' || member.role === 'zone_coordinator' ? 'Zonal Coordinator' : 'Choir Member'}
                     </span>
                   </div>
                 )}
@@ -1468,14 +1469,14 @@ function MemberManagementDrawer({
                       }}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                     >
-                      <optgroup label="👑 Headquarters Groups">
+                      <optgroup label="Headquarters Groups">
                         {allZones.filter(z => z.region === 'Headquarters' || z.id.startsWith('zone-00') || z.id.startsWith('zone-p') || z.id.startsWith('zone-orch') || z.id.startsWith('zone-dir') || z.id.startsWith('zone-of')).map(z => (
                           <option key={z.id} value={z.invitationCode || z.id}>
                             {z.name} ({z.invitationCode})
                           </option>
                         ))}
                       </optgroup>
-                      <optgroup label="🌍 Regional Chapters">
+                      <optgroup label="Regional Chapters">
                         {allZones.filter(z => z.region !== 'Headquarters' && !z.id.startsWith('zone-00') && !z.id.startsWith('zone-p') && !z.id.startsWith('zone-orch') && !z.id.startsWith('zone-dir') && !z.id.startsWith('zone-of') && z.id !== 'zone-boss').map(z => (
                           <option key={z.id} value={z.invitationCode || z.id}>
                             {z.name} ({z.invitationCode})

@@ -97,7 +97,7 @@ export default function SongDetailModal({
 
   // Helper function to get correct comment terminology based on zone
   const getCommentLabel = () => {
-    if (isSubGroup) return "Sub-Group Lead";
+    if (isSubGroup) return "Church Coordinator";
     return isHQGroup(currentZone?.id) ? "Pastor" : "Coordinator";
   };
 

@@ -94,48 +94,12 @@ export default function SplashPage() {
   const hasAuthCache = typeof window !== 'undefined' && localStorage.getItem(AUTH_CACHE_KEY) === 'true';
   const isRedirecting = (pathname === '/' && hasAuthCache);
 
-  if (isRedirecting) {
-    return (
-      <div className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-xs font-medium text-gray-400 animate-pulse">Resuming...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 flex flex-col items-center justify-center p-4">
-      <link rel="preload" href="/logo.png" as="image" />
-
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-gray-600 rounded-full blur-3xl"></div>
-        <div className="absolute top-20 right-20 w-24 h-24 bg-gray-500 rounded-full blur-2xl"></div>
-      </div>
-
-      <div className="relative z-10 flex flex-col items-center gap-8">
-        <img
-          src="/logo.png"
-          alt="LoveWorld Singers"
-          className="object-contain animate-bounce"
-          width={120}
-          height={120}
-          style={{
-            animationDuration: '2s',
-            animationIterationCount: 'infinite',
-            animationTimingFunction: 'ease-in-out'
-          }}
-        />
-
-        {/* Fail-safe button for stuck users */}
-        {showFailsafe && (
-          <button
-            onClick={() => window.location.reload()}
-            className="animate-in fade-in zoom-in duration-500 mt-8 px-8 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white font-semibold shadow-xl hover:bg-white/20 active:scale-95 transition-all outline-none"
-          >
-            Refresh
-          </button>
-        )}
+    <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col items-center justify-center p-4">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-9 h-9 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-semibold text-slate-500">Loading Rehearsal Hub...</p>
       </div>
     </div>
-  )
+  );
 }

@@ -17,6 +17,7 @@ import { PraiseNightHeader } from "@/components/praise-night/PraiseNightHeader";
 import { PraiseNightEmptyState } from "@/components/praise-night/PraiseNightEmptyState";
 import { PraiseNightBanner } from "@/components/praise-night/PraiseNightBanner";
 import { PraiseNightQuickActions } from "@/components/praise-night/PraiseNightQuickActions";
+import { SongScheduleModal } from "@/components/praise-night/SongScheduleModal";
 import { PraiseNightStatusFilter } from "@/components/praise-night/PraiseNightStatusFilter";
 import { PraiseNightSongList } from "@/components/praise-night/PraiseNightSongList";
 import { PraiseNightCategoryDrawer } from "@/components/praise-night/PraiseNightCategoryDrawer";
@@ -241,38 +242,77 @@ function PraiseNightPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPraiseNight, setCurrentPraiseNightState] = useState<PraiseNight | null>(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const getCurrentPage = () => currentPraiseNight;
+
+  const isSubgroupMode = categoryFilter === 'church' || categoryFilter === 'subgroup';
 
   const getCurrentSongs = useCallback(async (programId?: string, _force?: boolean): Promise<any[]> => {
     const targetProgId = programId || currentPraiseNight?.id;
-    if (!targetProgId) return [];
+    if (!targetProgId && !isSubgroupMode) return [];
     try {
+      if (isSubgroupMode || (currentPraiseNight as any)?.scope === 'subgroup' || (currentPraiseNight as any)?.subGroupId) {
+        const sgId = (currentPraiseNight as any)?.subGroupId;
+        const res = sgId
+          ? await apiClient.get<any>(`/subgroups/${encodeURIComponent(sgId)}/songs`).catch(() => null)
+          : await apiClient.get<any>('/subgroups/songs').catch(() => null);
+        let raw = Array.isArray(res?.data) ? res.data : [];
+        const targetSongIds = (currentPraiseNight as any)?.songIds;
+        if (targetSongIds && targetSongIds.length > 0) {
+          raw = raw.filter((s: any) => targetSongIds.includes(s.id));
+        }
+        return raw;
+      }
       const effectiveZone = currentZone?.id ? `&zoneId=${encodeURIComponent(currentZone.id)}` : '';
-      const res = await apiClient.get<any>(`/songs/praise-night?programId=${encodeURIComponent(targetProgId)}${effectiveZone}`);
+      const res = await apiClient.get<any>(`/songs/praise-night?programId=${encodeURIComponent(targetProgId!)}${effectiveZone}`);
       return Array.isArray(res?.data) ? res.data : [];
     } catch (e) {
       console.error('Failed to load songs:', e);
       return [];
     }
-  }, [currentPraiseNight?.id, currentZone?.id]);
+  }, [currentPraiseNight, currentZone?.id, isSubgroupMode]);
 
   useEffect(() => {
     const loadZonePrograms = async () => {
-      if (!currentZone?.id) return;
       setLoading(true);
       try {
-        const res = await apiClient.get<any>(`/programs?zoneId=${encodeURIComponent(currentZone.id)}`);
-        const data = (res?.data && Array.isArray(res.data)) ? res.data : [];
-        setAllPraiseNights(data);
-        if (data.length > 0) {
-          const target = (categoryFilter || 'ongoing').toLowerCase();
-          const match = data.find((p: any) => {
-            const cat = (p.category || '').toLowerCase().trim();
-            return cat === target;
-          }) || data[0];
-          setCurrentPraiseNightState(match);
+        if (isSubgroupMode) {
+          const [rehearsalsRes, subgroupsRes] = await Promise.all([
+            apiClient.get<any>('/subgroups/member-rehearsals').catch(() => null),
+            apiClient.get<any>('/subgroups/mine').catch(() => null),
+          ]);
+          const userSubgroups = subgroupsRes?.data || [];
+          const subgroupMap = new Map(userSubgroups.map((sg: any) => [sg.id, sg.name || 'Church']));
+          const data = (rehearsalsRes?.data || []).map((r: any) => ({
+            ...r,
+            id: r.id,
+            name: r.name || r.title || 'Church Rehearsal',
+            subGroupId: r.subGroupId || r.sub_group_id,
+            location: (r.subGroupId && subgroupMap.get(r.subGroupId)) || r.location || 'Church Choir',
+            scope: 'subgroup'
+          }));
+          setAllPraiseNights(data);
+          if (data.length > 0) {
+            const ongoing = data.find((p: any) => p.category === 'ongoing');
+            setCurrentPraiseNightState(ongoing || data[0]);
+          } else {
+            setCurrentPraiseNightState(null);
+          }
         } else {
-          setCurrentPraiseNightState(null);
+          if (!currentZone?.id) return;
+          const res = await apiClient.get<any>(`/programs?zoneId=${encodeURIComponent(currentZone.id)}`);
+          const data = (res?.data && Array.isArray(res.data)) ? res.data : [];
+          setAllPraiseNights(data);
+          if (data.length > 0) {
+            const target = (categoryFilter || 'ongoing').toLowerCase();
+            const match = data.find((p: any) => {
+              const cat = (p.category || '').toLowerCase().trim();
+              return cat === target;
+            }) || data[0];
+            setCurrentPraiseNightState(match);
+          } else {
+            setCurrentPraiseNightState(null);
+          }
         }
       } catch (err) {
         console.error('Failed to load programs for zone:', err);
@@ -281,7 +321,7 @@ function PraiseNightPageContent() {
       }
     };
     loadZonePrograms();
-  }, [currentZone?.id, categoryFilter]);
+  }, [currentZone?.id, categoryFilter, isSubgroupMode]);
 
   const refreshData = async () => {
     if (!currentZone?.id) return;
@@ -1148,8 +1188,15 @@ function PraiseNightPageContent() {
                   <PraiseNightBanner ecardSrc={ecardSrc} />
                 )}
                 {(categoryFilter !== 'archive' || !!pageParam) && currentPraiseNight && filteredPraiseNights.length > 0 && !(categoryFilter === 'pre-rehearsal' && filteredPraiseNights.length === 0) && (
-                  <PraiseNightQuickActions />
+                  <PraiseNightQuickActions onOpenSchedule={() => setIsScheduleModalOpen(true)} />
                 )}
+                <SongScheduleModal
+                  isOpen={isScheduleModalOpen}
+                  onClose={() => setIsScheduleModalOpen(false)}
+                  programId={currentPraiseNight?.id}
+                  programTitle={currentPraiseNight?.name}
+                  zoneId={currentZone?.id}
+                />
                 {/* Status Filter buttons/pills with category-specific count - Show for archive individual pages */}
                 {currentPraiseNight && (categoryFilter !== 'archive' || pageParam) && (
                   <PraiseNightStatusFilter 

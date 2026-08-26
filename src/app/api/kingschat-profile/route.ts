@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import https from 'https';
 
-const KINGSCHAT_API_KEY = process.env.KINGSCHAT_API_KEY || process.env.NEXT_PUBLIC_KINGSCHAT_API_KEY || 'cjAOL6hByMN3QA8CQ59K5MtG+4PdR2E6NbRL7hVa8po=';
+const KINGSCHAT_API_KEY = process.env.KINGSCHAT_API_KEY || process.env.NEXT_PUBLIC_KINGSCHAT_API_KEY || '';
 
 export async function GET(request: Request) {
   try {

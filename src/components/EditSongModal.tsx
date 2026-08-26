@@ -50,7 +50,7 @@ export default function EditSongModal({
   onUpdate
 }: EditSongModalProps) {
   const { theme } = useAdminTheme();
-  const { currentZone } = useZone();
+  const { currentZone, userRole } = useZone();
 
   // Auth helpers
   const getCurrentUserName = () => {
@@ -96,8 +96,12 @@ export default function EditSongModal({
   const [showAddPart, setShowAddPart] = useState(false);
   const [selectingPart, setSelectingPart] = useState<string | null>(null);
 
-  // Helper function to get correct comment terminology based on zone
+  // Helper function to get correct comment terminology based on zone & role
   const getCommentLabel = () => {
+    const roleStr = String(userRole || '').toLowerCase();
+    if (roleStr.includes('church') || roleStr.includes('subgroup')) {
+      return "Church Coordinator";
+    }
     return isHQGroup(currentZone?.id) ? "Pastor" : "Coordinator";
   };
 
