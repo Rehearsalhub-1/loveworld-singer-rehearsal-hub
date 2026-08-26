@@ -115,7 +115,15 @@ function saveStoredMembers(list: Member[]) {
 export default function Members() {
   const { user } = useAuth();
   const { currentZone } = useZone();
-  const { selectedZoneId, selectedZone, isGlobalView, isHQAdmin } = useAdminZone();
+  const { 
+    selectedZoneId, 
+    selectedZone, 
+    isGlobalView, 
+    isHQAdmin,
+    isChurchScope,
+    selectedChurchId,
+    selectedChurch,
+  } = useAdminZone();
 
   const [filterZone, setFilterZone] = useState<string>('all');
   const initialCache = membersCache.get(getCacheKey(selectedZoneId || 'all', 'all'));
@@ -154,7 +162,7 @@ export default function Members() {
   const loadMembers = async (forceRefresh = false) => {
     const effectiveZoneId = filterZone !== 'all' ? filterZone : selectedZoneId;
     const effectiveIsGlobal = effectiveZoneId === 'all';
-    const cacheKey = getCacheKey(effectiveZoneId, filterZone);
+    const cacheKey = getCacheKey(isChurchScope ? `church_${selectedChurchId}` : effectiveZoneId, filterZone);
 
     if (forceRefresh) {
       membersCache.delete(cacheKey);
@@ -171,9 +179,14 @@ export default function Members() {
     }
 
     try {
-      const query = effectiveIsGlobal
-        ? '/profiles/directory'
-        : `/profiles/directory?zone_code=${selectedZone?.invitationCode || effectiveZoneId}`;
+      let query = '';
+      if (isChurchScope && selectedChurchId) {
+        query = `/subgroups/${encodeURIComponent(selectedChurchId)}/members`;
+      } else if (effectiveIsGlobal) {
+        query = '/profiles/directory';
+      } else {
+        query = `/profiles/directory?zone_code=${encodeURIComponent(selectedZone?.invitationCode || effectiveZoneId)}`;
+      }
       const res = await apiClient.get<{ success: boolean; data: any[] }>(query);
       const rawList = res?.data || [];
 

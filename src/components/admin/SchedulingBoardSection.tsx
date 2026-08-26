@@ -10,7 +10,13 @@ import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { apiClient } from '@/lib/api-client';
 
 const useSchedulingBoard = () => {
-  const { selectedZoneId, isGlobalView, selectedZone } = useAdminZone();
+  const { 
+    selectedZoneId, 
+    isGlobalView, 
+    selectedZone, 
+    isChurchScope, 
+    selectedChurchId 
+  } = useAdminZone();
   const effectiveZoneId = isGlobalView ? null : (selectedZoneId || selectedZone?.id || null);
 
   const [loading, setLoading] = useState(true);
@@ -21,7 +27,12 @@ const useSchedulingBoard = () => {
   const loadPrograms = useCallback(async () => {
     try {
       setLoading(true);
-      const zoneQuery = effectiveZoneId ? `?zoneId=${encodeURIComponent(effectiveZoneId)}` : '';
+      let zoneQuery = '';
+      if (isChurchScope && selectedChurchId) {
+        zoneQuery = `?subGroupId=${encodeURIComponent(selectedChurchId)}`;
+      } else if (effectiveZoneId) {
+        zoneQuery = `?zoneId=${encodeURIComponent(effectiveZoneId)}`;
+      }
       const res = await apiClient.get<any>(`/schedule${zoneQuery}`);
       let data: any[] = [];
       if (Array.isArray(res)) {
@@ -44,7 +55,7 @@ const useSchedulingBoard = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveZoneId]);
+  }, [effectiveZoneId, isChurchScope, selectedChurchId]);
 
   useEffect(() => {
     loadPrograms();
@@ -56,7 +67,8 @@ const useSchedulingBoard = () => {
     try {
       const res = await apiClient.post<any>('/schedule', { 
         name,
-        zoneId: effectiveZoneId || 'global'
+        zoneId: isChurchScope ? selectedChurchId || 'church' : (effectiveZoneId || 'global'),
+        subGroupId: isChurchScope ? selectedChurchId : undefined
       });
       const newProg = res?.data || (res?.id ? res : null);
       if (newProg && newProg.id) {

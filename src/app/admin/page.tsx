@@ -62,9 +62,12 @@ const ZoneDatabaseService = {
     }
   },
 
-  getCategories: async (_zoneId?: string) => {
+  getCategories: async (zoneId?: string) => {
     try {
-      const res = await apiClient.get<{ success: boolean; data: any[] }>('/categories');
+      const url = (zoneId && zoneId !== 'all' && zoneId !== 'global') 
+        ? `/categories?zoneId=${encodeURIComponent(zoneId)}` 
+        : '/categories';
+      const res = await apiClient.get<{ success: boolean; data: any[] }>(url);
       return Array.isArray(res?.data) ? res.data : [];
     } catch {
       return [];
@@ -611,15 +614,12 @@ function AdminContent() {
     return combinedCategories;
   }, [dbCategories, allAvailableCategories]);
 
-  // Load categories from database (zone-aware)
+  // Load categories from database (zone-aware & church-aware)
   useEffect(() => {
     const loadCategories = async () => {
-      if (!currentZone) {
-        return;
-      }
-
+      const targetZone = isChurchScope ? selectedChurchId : isGlobalView ? 'all' : (selectedZoneId || currentZone?.id);
       try {
-        const categories = await ZoneDatabaseService.getCategories(currentZone.id);
+        const categories = await ZoneDatabaseService.getCategories(targetZone || undefined);
 
         // Map categories to include both Firebase ID and Supabase ID
         const mappedCategories = categories.map((category: any) => ({
@@ -636,17 +636,14 @@ function AdminContent() {
     };
 
     loadCategories();
-  }, [currentZone]);
+  }, [selectedZoneId, isGlobalView, isChurchScope, selectedChurchId, currentZone]);
 
-  // Load page categories from database (zone-aware)
+  // Load page categories from database (zone-aware & church-aware)
   useEffect(() => {
     const loadPageCategories = async () => {
-      if (!currentZone) {
-        return;
-      }
-
+      const targetZone = isChurchScope ? selectedChurchId : isGlobalView ? 'all' : (selectedZoneId || currentZone?.id);
       try {
-        const categories = await ZoneDatabaseService.getPageCategories(currentZone.id);
+        const categories = await ZoneDatabaseService.getPageCategories(targetZone || undefined);
         setPageCategories(categories);
       } catch (error) {
         console.error('Error loading page categories:', error);
@@ -654,7 +651,7 @@ function AdminContent() {
     };
 
     loadPageCategories();
-  }, [currentZone]);
+  }, [selectedZoneId, isGlobalView, isChurchScope, selectedChurchId, currentZone]);
 
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
 

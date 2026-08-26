@@ -129,6 +129,12 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.setItem('admin_selected_zone_id', zoneId);
       sessionStorage.removeItem('admin_selected_church_id');
     }
+    // ── Update the API client scope store so all future requests carry the right headers
+    apiClient.setActiveScope({
+      zoneId: zoneId !== 'all' ? zoneId : null,
+      churchId: null,
+      scope: zoneId !== 'all' ? 'zone' : 'global',
+    });
     if (zoneId !== 'all') {
       if (typeof window !== 'undefined') {
         localStorage.setItem('lwsrh_active_zone_id', zoneId);
@@ -146,6 +152,12 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.removeItem('admin_selected_church_id');
       }
     }
+    // ── Update the API client scope store so all future requests carry the right headers
+    apiClient.setActiveScope({
+      zoneId: churchId ? (selectedZoneId !== 'all' ? selectedZoneId : null) : (selectedZoneId !== 'all' ? selectedZoneId : null),
+      churchId: churchId || null,
+      scope: churchId ? 'church' : (selectedZoneId !== 'all' ? 'zone' : 'global'),
+    });
   };
 
   const selectedZone = useMemo(() => {

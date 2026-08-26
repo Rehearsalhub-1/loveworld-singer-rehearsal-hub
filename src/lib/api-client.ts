@@ -92,6 +92,48 @@ async function refreshSession(): Promise<string> {
   return newAccess;
 }
 
+/**
+ * TENANT SCOPE STORE — a simple singleton that the AdminZoneContext writes to
+ * and the API client reads from on every request.
+ *
+ * This is the mechanism that eliminates manual ?zoneId= query params across all screens.
+ * Instead of every component building query strings, AdminZoneContext calls setActiveScope()
+ * once when the scope changes, and every subsequent API request automatically carries the right headers.
+ */
+interface ActiveScope {
+  zoneId: string | null;
+  churchId: string | null;
+  /** 'global' | 'zone' | 'church' */
+  scope: string;
+}
+
+let _activeScope: ActiveScope = { zoneId: null, churchId: null, scope: 'global' };
+
+export function setActiveScope(scope: ActiveScope): void {
+  _activeScope = scope;
+  // Also persist to localStorage so the scope survives page refreshes
+  if (typeof window !== 'undefined') {
+    if (scope.zoneId) localStorage.setItem('lwsrh_active_zone_id', scope.zoneId);
+    else localStorage.removeItem('lwsrh_active_zone_id');
+    if (scope.churchId) localStorage.setItem('lwsrh_active_church_id', scope.churchId);
+    else localStorage.removeItem('lwsrh_active_church_id');
+    localStorage.setItem('lwsrh_active_scope', scope.scope);
+  }
+}
+
+export function getActiveScope(): ActiveScope {
+  // On first load, hydrate from localStorage (handles page refresh)
+  if (typeof window !== 'undefined' && _activeScope.scope === 'global' && !_activeScope.zoneId) {
+    const storedZoneId = localStorage.getItem('lwsrh_active_zone_id') || null;
+    const storedChurchId = localStorage.getItem('lwsrh_active_church_id') || null;
+    const storedScope = localStorage.getItem('lwsrh_active_scope') || 'global';
+    if (storedZoneId || storedChurchId) {
+      _activeScope = { zoneId: storedZoneId, churchId: storedChurchId, scope: storedScope };
+    }
+  }
+  return _activeScope;
+}
+
 const apiGetCache = new Map<string, any>();
 
 async function request<T>(
@@ -104,13 +146,23 @@ async function request<T>(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  if (typeof window !== 'undefined') {
-    const activeZone = localStorage.getItem('lwsrh_active_zone_id') || sessionStorage.getItem('admin_selected_zone_id');
-    if (activeZone) {
-      headers['x-zone-id'] = activeZone;
-      headers['x-zone-code'] = activeZone;
-    }
+  // ── TENANT SCOPE HEADERS ─────────────────────────────────────────────────
+  // Read the current active scope (set by AdminZoneContext when user switches views)
+  // and automatically attach it as standard HTTP headers on every request.
+  // NO screen component ever needs to manually build ?zoneId= or ?churchId= again.
+  const scope = getActiveScope();
+  if (scope.zoneId) {
+    headers['x-zone-id'] = scope.zoneId;
+    headers['x-zone-code'] = scope.zoneId;
   }
+  if (scope.churchId) {
+    headers['x-church-id'] = scope.churchId;
+    headers['x-subgroup-id'] = scope.churchId;
+  }
+  if (scope.scope) {
+    headers['x-scope'] = scope.scope;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
@@ -130,7 +182,7 @@ async function request<T>(
           const newToken = await refreshSession();
           const retryRes = await fetch(`${BASE_URL}${path}`, {
             method,
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${newToken}` },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${newToken}`, ...headers },
             ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
           });
           if (retryRes.status !== 401) {
@@ -170,6 +222,9 @@ export const apiClient = {
   setAccessToken,
   clearAccessToken,
   setUserId,
+  /** Call this whenever the admin switches zone or church scope. All future requests will carry the right headers. */
+  setActiveScope,
+  getActiveScope,
 };
 
 type ApiEnvelope<T = unknown> = {

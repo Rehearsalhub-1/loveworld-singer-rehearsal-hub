@@ -30,7 +30,14 @@ export interface AttendanceRecord {
 }
 
 export default function AttendanceSection() {
-  const { selectedZoneId, isGlobalView, selectedZone } = useAdminZone();
+  const { 
+    selectedZoneId, 
+    isGlobalView, 
+    selectedZone, 
+    isChurchScope, 
+    selectedChurchId, 
+    selectedChurch 
+  } = useAdminZone();
   const effectiveZoneId = isGlobalView ? null : (selectedZoneId || selectedZone?.id || null);
   const isHQ = isGlobalView || (effectiveZoneId ? isHQGroup(effectiveZoneId) : false);
 
@@ -74,9 +81,15 @@ export default function AttendanceSection() {
   const loadAttendance = useCallback(async (silent = false) => {
     if (!silent && allRecords.length === 0) setLoading(true);
     try {
-      const query = isGlobalView || !effectiveZoneId 
-        ? '/attendance' 
-        : `/attendance?zoneId=${encodeURIComponent(effectiveZoneId)}`;
+      let query = '';
+      if (isChurchScope && selectedChurchId) {
+        query = `/attendance?subGroupId=${encodeURIComponent(selectedChurchId)}`;
+      } else if (!isGlobalView && effectiveZoneId) {
+        query = `/attendance?zoneId=${encodeURIComponent(effectiveZoneId)}`;
+      } else {
+        query = '/attendance';
+      }
+
       const res = await apiClient.get<{ success: boolean; data: any[] }>(query);
       if (res?.data && Array.isArray(res.data)) {
         setAllRecords(res.data);
@@ -87,13 +100,18 @@ export default function AttendanceSection() {
         });
 
         setAttendanceRecords(filteredByDate);
+      } else {
+        setAllRecords([]);
+        setAttendanceRecords([]);
       }
     } catch (error) {
       console.error('Error loading attendance:', error);
+      setAllRecords([]);
+      setAttendanceRecords([]);
     } finally {
       setLoading(false);
     }
-  }, [effectiveZoneId, isGlobalView, selectedDate, allRecords.length]);
+  }, [effectiveZoneId, isGlobalView, isChurchScope, selectedChurchId, selectedDate, allRecords.length]);
 
   useEffect(() => {
     loadAttendance();
@@ -104,44 +122,46 @@ export default function AttendanceSection() {
   const totalCount = attendanceRecords.length;
   const attendanceRate = totalCount > 0 ? Math.round(((presentCount + clockedOutCount) / totalCount) * 100) : 0;
 
-  // 1. CREATE: Manual Check-In (Optimistic State Sync)
+  // 1. CREATE: Manual Check In (Optimistic UI)
   const handleManualCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = manualName.trim();
-    if (!name) return;
+    if (!name) {
+      showToast('error', 'Please enter a name');
+      return;
+    }
 
-    setSubmittingManual(true);
-    const tempId = `manual_${Date.now()}`;
-    const now = new Date().toISOString();
+    const tempId = `temp_${Date.now()}`;
+    const checkInTime = new Date().toISOString();
+
     const optimisticRecord: AttendanceRecord = {
       id: tempId,
-      user_id: tempId,
-      userName: name,
       user_name: name,
-      eventName: manualEvent.trim() || 'Rehearsal',
+      userName: name,
       event_name: manualEvent.trim() || 'Rehearsal',
+      eventName: manualEvent.trim() || 'Rehearsal',
       status: manualStatus,
-      zoneId: effectiveZoneId || 'global',
-      check_in_time: manualStatus === 'present' ? now : undefined,
-      checkInTime: manualStatus === 'present' ? now : undefined,
+      check_in_time: checkInTime,
+      checkInTime: checkInTime,
       date_string: selectedDate,
       dateString: selectedDate,
-      created_at: now,
+      zoneId: isChurchScope ? selectedChurchId || 'church' : (effectiveZoneId || 'global'),
     };
 
-    // Optimistic update
-    setAllRecords(prev => [optimisticRecord, ...prev]);
     setAttendanceRecords(prev => [optimisticRecord, ...prev]);
+    setAllRecords(prev => [optimisticRecord, ...prev]);
     setShowManualModal(false);
     setManualName('');
-    showToast('success', `Logged attendance for ${name}`);
+    showToast('success', `${name} checked in successfully`);
+    setSubmittingManual(true);
 
     try {
       const res = await apiClient.post<{ success: boolean; data: any }>('/attendance/manual', {
         userName: name,
         eventName: manualEvent.trim() || 'Rehearsal',
         status: manualStatus,
-        zoneId: effectiveZoneId || 'global',
+        zoneId: isChurchScope ? selectedChurchId || 'church' : (effectiveZoneId || 'global'),
+        subGroupId: isChurchScope ? selectedChurchId : undefined,
         dateString: selectedDate,
       });
 
