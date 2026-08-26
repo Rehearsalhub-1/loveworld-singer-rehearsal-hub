@@ -70,6 +70,9 @@ function AuthPageContent() {
   // KingsChat State
   const [isKingsChatActive, setIsKingsChatActive] = useState(false);
   const [kingsChatProfile, setKingsChatProfile] = useState<any>(null);
+  const [multipleAccounts, setMultipleAccounts] = useState<any[] | null>(null);
+  const [savedKcAuth, setSavedKcAuth] = useState<{ accessToken: string; kingschatUserId?: string; profile?: any } | null>(null);
+  const [accountSelectLoading, setAccountSelectLoading] = useState(false);
 
   // Zone Picker State
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
@@ -139,6 +142,8 @@ function AuthPageContent() {
 
       setSuccess('Connecting to KingsChat...');
       
+      const kcProfile = await KingsChatAuthService.getUserProfile(authTokens.accessToken);
+
       const res = await apiClient.post<{
         success: boolean;
         data?: { accessToken: string; refreshToken: string; user?: any };
@@ -149,6 +154,9 @@ function AuthPageContent() {
         error?: string;
       }>('/auth/kingschat-login', {
         accessToken: authTokens.accessToken,
+        kingschatUserId: kcProfile?.userId,
+        email: kcProfile?.email,
+        profile: kcProfile,
       });
 
       if (res.success && res.data) {
@@ -162,6 +170,18 @@ function AuthPageContent() {
         setSuccess('Login successful! Welcome back...');
         const urlParams = new URLSearchParams(window.location.search);
         router.replace(urlParams.get('returnUrl') || '/home');
+        return;
+      }
+
+      // Multiple accounts linked to this KingsChat ID -> show Account Chooser Modal
+      if (res.code === 'MULTIPLE_ACCOUNTS' && res.accounts && res.accounts.length > 1) {
+        setMultipleAccounts(res.accounts);
+        setSavedKcAuth({
+          accessToken: authTokens.accessToken,
+          kingschatUserId: res.kingschatUserId || kcProfile?.userId,
+          profile: kcProfile,
+        });
+        setIsLoading(false);
         return;
       }
 
@@ -189,6 +209,46 @@ function AuthPageContent() {
       console.error('KingsChat Error:', err);
       setError(sanitizeError(err?.message || 'KingsChat login failed'));
       setIsLoading(false);
+    }
+  };
+
+  // Multiple Accounts Selector Action
+  const handleSelectAccount = async (targetEmail: string) => {
+    if (!savedKcAuth) return;
+    setAccountSelectLoading(true);
+    setError('');
+    try {
+      const res = await apiClient.post<{
+        success: boolean;
+        data?: { accessToken: string; refreshToken: string; user?: any };
+        error?: string;
+      }>('/auth/kingschat-login', {
+        accessToken: savedKcAuth.accessToken,
+        email: targetEmail,
+        kingschatUserId: savedKcAuth.kingschatUserId,
+        profile: savedKcAuth.profile,
+      });
+
+      if (res.success && res.data) {
+        apiClient.setAccessToken(res.data.accessToken);
+        if (typeof window !== 'undefined') {
+          document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
+          localStorage.setItem('lwsrh_has_user', 'true');
+          localStorage.setItem('userAuthenticated', 'true');
+          localStorage.setItem('authProvider', 'kingschat');
+        }
+        setMultipleAccounts(null);
+        setSuccess('Login successful! Welcome back...');
+        const urlParams = new URLSearchParams(window.location.search);
+        router.replace(urlParams.get('returnUrl') || '/home');
+        return;
+      }
+
+      throw new Error(res.error || 'Failed to sign in with selected account');
+    } catch (err: any) {
+      setError(sanitizeError(err?.message || 'Failed to sign in with selected account'));
+    } finally {
+      setAccountSelectLoading(false);
     }
   };
 
@@ -899,6 +959,88 @@ function AuthPageContent() {
                   {forgotLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Password'}
                 </button>
               </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* KingsChat Multi-Account Chooser Modal */}
+      {multipleAccounts && multipleAccounts.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 animate-scaleUp">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Select Account</h3>
+                  <p className="text-xs text-slate-500">Multiple accounts found for this KingsChat ID</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMultipleAccounts(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-4">
+              Choose the profile you would like to sign into for this session:
+            </p>
+
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {multipleAccounts.map((acc, idx) => {
+                const fullName = `${acc.firstName || ''} ${acc.lastName || ''}`.trim() || 'Singer';
+                const roleBadge =
+                  acc.role === 'super_admin' || acc.role === 'hq_admin' || acc.hasHqAccess
+                    ? 'HQ Admin'
+                    : acc.role === 'zone_coordinator'
+                    ? 'Zonal Coordinator'
+                    : acc.role === 'church_coordinator'
+                    ? 'Church Coordinator'
+                    : acc.role === 'subgroup_coordinator'
+                    ? 'Group Coordinator'
+                    : 'Choir Member';
+
+                return (
+                  <button
+                    key={acc.id || idx}
+                    type="button"
+                    disabled={accountSelectLoading}
+                    onClick={() => handleSelectAccount(acc.email)}
+                    className="w-full p-4 rounded-2xl border border-slate-200 hover:border-purple-500 bg-slate-50 hover:bg-purple-50/50 transition-all flex items-center justify-between text-left group"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-sm shadow-sm group-hover:scale-105 transition-transform">
+                        {acc.firstName ? acc.firstName[0].toUpperCase() : 'S'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900">{fullName}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                            {roleBadge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">{acc.email}</p>
+                        {acc.zoneCode && (
+                          <p className="text-[11px] text-slate-400 mt-0.5">Zone: {acc.zoneCode}</p>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+                  </button>
+                );
+              })}
+            </div>
+
+            {accountSelectLoading && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-purple-600 font-semibold">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Signing in...
+              </div>
             )}
           </div>
         </div>

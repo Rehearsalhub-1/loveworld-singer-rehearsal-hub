@@ -53,12 +53,18 @@ export function useSubGroup() {
     fetchSubGroups();
   }, [fetchSubGroups]);
 
-  const isCoordinatorFromData = coordinatedSubGroups.length > 0;
+  const isCoordinatorFromData = coordinatedSubGroups.some(
+    (sg) => sg.status === 'active' || sg.status === 'approved' || (sg.approvalStatus === 'approved' && sg.status !== 'pending')
+  );
   const isCoordinatorFromProfile = Boolean(
-    (profile as any)?.is_subgroup_coordinator ||
+    (profile as any)?.is_subgroup_coordinator === true ||
+    (profile as any)?.role === 'church_coordinator' ||
+    (profile as any)?.role === 'subgroup_coordinator' ||
     (profile as any)?.role === 'subgroup_admin' ||
+    (profile as any)?.role === 'zone_coordinator' ||
     (profile as any)?.role === 'zone_admin' ||
     (profile as any)?.role === 'hq_admin' ||
+    (profile as any)?.role === 'super_admin' ||
     (profile as any)?.role === 'admin' ||
     (profile as any)?.role === 'boss'
   );

@@ -108,16 +108,6 @@ export default function RehearsalsPage() {
         iconBg: 'bg-emerald-100',
         iconColor: 'text-emerald-600'
       }] : []),
-      ...(!hiddenFeatures.hideAudioLab ? [{
-        id: 'audiolab',
-        title: 'AudioLab Studio',
-        description: 'Record, mix and practice your vocal parts',
-        icon: Mic,
-        href: '/pages/audiolab',
-        gradient: 'from-indigo-600 via-purple-600 to-pink-600',
-        iconBg: 'bg-indigo-100',
-        iconColor: 'text-indigo-600'
-      }] : []),
       ...(!hiddenFeatures.hideWarmups && !hiddenFeatures.hideVocalWarmups ? [{
         id: 'vocal-warmups',
         title: 'Vocal Warm-ups',
@@ -153,7 +143,7 @@ export default function RehearsalsPage() {
         title: 'Church',
         description: 'Access your church choir or fellowship rehearsal hub',
         icon: Users,
-        href: '/pages/praise-night?category=church',
+        href: '/pages/programs?category=church',
         gradient: 'from-orange-600 via-amber-600 to-yellow-600',
         iconBg: 'bg-orange-100',
         iconColor: 'text-orange-600'
@@ -163,7 +153,7 @@ export default function RehearsalsPage() {
         title: 'Church Admin',
         description: 'Manage your church choir songs, members, and rehearsals',
         icon: Shield,
-        href: '/subgroup-admin',
+        href: '/admin',
         gradient: 'from-indigo-600 via-violet-600 to-purple-600',
         iconBg: 'bg-indigo-100',
         iconColor: 'text-indigo-600'
