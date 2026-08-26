@@ -23,6 +23,7 @@ import {
 import { ZONES, Zone, getZoneByInvitationCode, isHQGroup } from '@/config/zones';
 import { KingsChatAuthService } from '@/lib/kingschat-auth';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 import CustomLoader from '@/components/CustomLoader';
 import { apiClient } from '@/lib/api-client';
 
@@ -90,12 +91,12 @@ function AuthPageContent() {
 
   // Redirect observer
   useEffect(() => {
-    if (user) {
+    if (user && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const returnUrl = urlParams.get('returnUrl') || '/home';
-      router.replace(returnUrl);
+      window.location.href = returnUrl;
     }
-  }, [user, router]);
+  }, [user]);
 
   // Modal Tab Mode & Invitation Code lookup
   const [zoneModalTab, setZoneModalTab] = useState<'browse' | 'code'>('browse');
@@ -142,8 +143,6 @@ function AuthPageContent() {
 
       setSuccess('Connecting to KingsChat...');
       
-      const kcProfile = await KingsChatAuthService.getUserProfile(authTokens.accessToken);
-
       const res = await apiClient.post<{
         success: boolean;
         data?: { accessToken: string; refreshToken: string; user?: any };
@@ -154,12 +153,16 @@ function AuthPageContent() {
         error?: string;
       }>('/auth/kingschat-login', {
         accessToken: authTokens.accessToken,
-        kingschatUserId: kcProfile?.userId,
-        profile: kcProfile,
       });
 
       if (res.success && res.data) {
         apiClient.setAccessToken(res.data.accessToken);
+        if (res.data.user) {
+          useAuthStore.getState().setUser(res.data.user);
+          if (res.data.user.id) {
+            localStorage.setItem('userId', res.data.user.id);
+          }
+        }
         if (typeof window !== 'undefined') {
           document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
           localStorage.setItem('lwsrh_has_user', 'true');
@@ -168,7 +171,10 @@ function AuthPageContent() {
         }
         setSuccess('Login successful! Welcome back...');
         const urlParams = new URLSearchParams(window.location.search);
-        router.replace(urlParams.get('returnUrl') || '/home');
+        const destination = urlParams.get('returnUrl') || '/home';
+        if (typeof window !== 'undefined') {
+          window.location.href = destination;
+        }
         return;
       }
 
@@ -177,8 +183,8 @@ function AuthPageContent() {
         setMultipleAccounts(res.accounts);
         setSavedKcAuth({
           accessToken: authTokens.accessToken,
-          kingschatUserId: res.kingschatUserId || kcProfile?.userId,
-          profile: kcProfile,
+          kingschatUserId: res.kingschatUserId,
+          profile: res.profile,
         });
         setIsLoading(false);
         return;
@@ -231,6 +237,12 @@ function AuthPageContent() {
 
       if (res.success && res.data) {
         apiClient.setAccessToken(res.data.accessToken);
+        if (res.data.user) {
+          useAuthStore.getState().setUser(res.data.user);
+          if (res.data.user.id) {
+            localStorage.setItem('userId', res.data.user.id);
+          }
+        }
         if (typeof window !== 'undefined') {
           document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
           localStorage.setItem('lwsrh_has_user', 'true');
@@ -240,7 +252,10 @@ function AuthPageContent() {
         setMultipleAccounts(null);
         setSuccess('Login successful! Welcome back...');
         const urlParams = new URLSearchParams(window.location.search);
-        router.replace(urlParams.get('returnUrl') || '/home');
+        const destination = urlParams.get('returnUrl') || '/home';
+        if (typeof window !== 'undefined') {
+          window.location.href = destination;
+        }
         return;
       }
 
@@ -278,6 +293,12 @@ function AuthPageContent() {
         }
 
         apiClient.setAccessToken(res.data.accessToken);
+        if (res.data.user) {
+          useAuthStore.getState().setUser(res.data.user);
+          if (res.data.user.id) {
+            localStorage.setItem('userId', res.data.user.id);
+          }
+        }
         if (typeof window !== 'undefined') {
           document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
           localStorage.setItem('lwsrh_has_user', 'true');
@@ -285,7 +306,11 @@ function AuthPageContent() {
         }
         setSuccess('Signed in successfully! Redirecting...');
         const urlParams = new URLSearchParams(window.location.search);
-        router.replace(urlParams.get('returnUrl') || '/home');
+        const destination = urlParams.get('returnUrl') || '/home';
+        if (typeof window !== 'undefined') {
+          window.location.href = destination;
+        }
+        return;
       } else {
         // Sign Up
         if (!formData.firstName.trim() || !formData.lastName.trim()) {

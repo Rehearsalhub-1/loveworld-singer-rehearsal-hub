@@ -19,7 +19,7 @@ export default function RehearsalsPage() {
   const router = useRouter()
   const { signOut, profile } = useAuth()
   const { currentZone, isZoneCoordinator, userRole } = useZone()
-  const { isSubGroupCoordinator, memberSubGroups } = useSubGroup()
+  const { isSubGroupCoordinator, memberSubGroups, coordinatedSubGroups } = useSubGroup()
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -153,7 +153,7 @@ export default function RehearsalsPage() {
         title: 'Church Admin',
         description: 'Manage your church choir songs, members, and rehearsals',
         icon: Shield,
-        href: '/admin',
+        href: coordinatedSubGroups[0]?.id ? `/admin?churchId=${encodeURIComponent(coordinatedSubGroups[0].id)}&section=Pages` : '/admin?scope=church&section=Pages',
         gradient: 'from-indigo-600 via-violet-600 to-purple-600',
         iconBg: 'bg-indigo-100',
         iconColor: 'text-indigo-600'

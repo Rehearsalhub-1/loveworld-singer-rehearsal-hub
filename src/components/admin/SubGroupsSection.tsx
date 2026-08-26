@@ -63,17 +63,34 @@ export default function SubGroupsSection({ addToast }: SubGroupsSectionProps) {
       const url = effectiveZoneId 
         ? `/subgroups?zoneId=${encodeURIComponent(effectiveZoneId)}` 
         : '/subgroups';
-      const res = await apiClient.get<{ success: boolean; data: any[] }>(url);
-      if (res?.success !== false && Array.isArray(res?.data)) {
-        const shaped: SubGroup[] = res.data.map((sg: any) => ({
-          ...sg,
-          type: sg.type || 'church',
-          status: sg.status || 'active',
+      
+      const [sgRes, adminReqRes] = await Promise.all([
+        apiClient.get<{ success: boolean; data: any[] }>(url).catch(() => ({ data: [] })),
+        apiClient.get<{ success: boolean; data: any[] }>('/members/admin-requests').catch(() => ({ data: [] })),
+      ]);
+
+      const sgList: SubGroup[] = (Array.isArray(sgRes?.data) ? sgRes.data : []).map((sg: any) => ({
+        ...sg,
+        type: sg.type || 'church',
+        status: sg.status || 'active',
+      }));
+
+      const adminReqs: SubGroup[] = (Array.isArray(adminReqRes?.data) ? adminReqRes.data : [])
+        .filter((r: any) => r.status === 'pending')
+        .map((r: any) => ({
+          ...r,
+          id: r.id,
+          name: `${r.userName || r.userEmail || 'User'} (${r.requestedRole || 'Coordinator'})`,
+          type: 'role_request',
+          status: 'pending',
+          coordinatorName: r.userName || r.userEmail,
+          coordinatorEmail: r.userEmail,
+          description: r.reason || `Requested role upgrade: ${r.requestedRole}`,
+          zoneId: r.zoneId || r.zoneCode || 'global',
+          isRoleRequest: true,
         }));
-        setSubGroups(shaped);
-      } else {
-        setSubGroups([]);
-      }
+
+      setSubGroups([...sgList, ...adminReqs.filter(ar => !sgList.some(sg => sg.id === ar.id))]);
     } catch (err) {
       console.error('Error fetching churches:', err);
       setSubGroups([]);
@@ -115,18 +132,25 @@ export default function SubGroupsSection({ addToast }: SubGroupsSectionProps) {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      const res = await apiClient.post<{ success: boolean; message?: string }>(`/subgroups/${encodeURIComponent(id)}/approve`);
+      const targetGroup = subGroups.find(sg => sg.id === id);
+      let res;
+      if (targetGroup?.isRoleRequest) {
+        res = await apiClient.post<{ success: boolean; message?: string }>(`/members/admin-requests/${encodeURIComponent(id)}/approve`);
+      } else {
+        res = await apiClient.post<{ success: boolean; message?: string }>(`/subgroups/${encodeURIComponent(id)}/approve`);
+      }
+
       if (res?.success !== false) {
-        addToast({ message: 'Church approved successfully!', type: 'success' });
+        addToast({ message: 'Approved successfully!', type: 'success' });
         setSubGroups(prev => prev.map(sg => sg.id === id ? { ...sg, status: 'active' } : sg));
         if (selectedSubGroup?.id === id) {
           setSelectedSubGroup(prev => prev ? { ...prev, status: 'active' } : null);
         }
       } else {
-        addToast({ message: 'Failed to approve church', type: 'error' });
+        addToast({ message: 'Failed to approve request', type: 'error' });
       }
     } catch {
-      addToast({ message: 'Failed to approve church', type: 'error' });
+      addToast({ message: 'Failed to approve request', type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -142,21 +166,29 @@ export default function SubGroupsSection({ addToast }: SubGroupsSectionProps) {
     if (!selectedSubGroup || !rejectReason.trim() || isProcessing) return;
     setIsProcessing(true);
     try {
-      const res = await apiClient.post<{ success: boolean; message?: string }>(
-        `/subgroups/${encodeURIComponent(selectedSubGroup.id)}/reject`,
-        { reason: rejectReason.trim() }
-      );
+      let res;
+      if (selectedSubGroup?.isRoleRequest) {
+        res = await apiClient.post<{ success: boolean; message?: string }>(
+          `/members/admin-requests/${encodeURIComponent(selectedSubGroup.id)}/reject`,
+          { reason: rejectReason.trim() }
+        );
+      } else {
+        res = await apiClient.post<{ success: boolean; message?: string }>(
+          `/subgroups/${encodeURIComponent(selectedSubGroup.id)}/reject`,
+          { reason: rejectReason.trim() }
+        );
+      }
       if (res?.success !== false) {
-        addToast({ message: 'Church request rejected.', type: 'info' });
+        addToast({ message: 'Request rejected.', type: 'info' });
         setSubGroups(prev => prev.map(sg => sg.id === selectedSubGroup.id ? { ...sg, status: 'rejected' } : sg));
         setIsRejectModalOpen(false);
         setIsDetailModalOpen(false);
         setSelectedSubGroup(null);
       } else {
-        addToast({ message: 'Failed to reject church', type: 'error' });
+        addToast({ message: 'Failed to reject request', type: 'error' });
       }
     } catch {
-      addToast({ message: 'Failed to reject church', type: 'error' });
+      addToast({ message: 'Failed to reject request', type: 'error' });
     } finally {
       setIsProcessing(false);
     }

@@ -14,8 +14,16 @@ import { useAuth } from '@/stores/authStore';
 import { isHQAdminEmail } from '@/config/roles';
 import { isHQGroup } from '@/config/zones';
 const ZoneDatabaseService = {
-  createPraiseNight: async (zoneId: string, data: any) => {
+  createPraiseNight: async (zoneId: string, data: any, churchId?: string | null) => {
     try {
+      if (churchId || data?.subGroupId || data?.churchId) {
+        const sgId = churchId || data.subGroupId || data.churchId;
+        const res = await apiClient.post<{ success: boolean; data?: { id?: string }; error?: string }>(
+          '/subgroups/praise-nights',
+          { ...data, subGroupId: sgId }
+        );
+        return { success: res?.success !== false, id: res?.data?.id, error: res?.error };
+      }
       const res = await apiClient.post<{ success: boolean; data?: { id?: string }; error?: string }>('/programs', {
         ...data,
         zoneId: zoneId || 'zone-001',
@@ -28,6 +36,13 @@ const ZoneDatabaseService = {
 
   updatePraiseNight: async (id: string, data: any, zoneId?: string) => {
     try {
+      if (data?.subGroupId || data?.churchId) {
+        const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(
+          `/subgroups/praise-nights/${encodeURIComponent(id)}`,
+          data
+        );
+        return { success: res?.success !== false, id, error: res?.error };
+      }
       const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(`/programs/${encodeURIComponent(id)}`, {
         ...data,
         ...(zoneId ? { zoneId } : {}),
@@ -256,7 +271,15 @@ function AdminContent() {
 
   // Zone context - must be called before any conditional returns
   const { currentZone, isZoneCoordinator, isLoading: zoneLoading } = useZone();
-  const { selectedZoneId, selectedZone, isGlobalView } = useAdminZone();
+  const { 
+    selectedZoneId, 
+    selectedZone, 
+    isGlobalView, 
+    isChurchScope, 
+    selectedChurchId, 
+    selectedChurch, 
+    setSelectedChurchId 
+  } = useAdminZone();
 
   // Sub-group management (for Zone Coordinators) - must be called before any conditional returns
   const { pendingCount: pendingSubGroupCount } = useZoneSubGroups();
@@ -287,8 +310,24 @@ function AdminContent() {
   
   const allowedSections = isJoyKures ? ['Pages'] : isUsman ? ['Master Library', 'Karaoke Config'] : null;
 
+  const initialSectionFromUrl = searchParams.get('section') || searchParams.get('tab');
+
+  const isChurchAdminOnly = Boolean(
+    !isHQAdmin &&
+    !isZoneCoordinator &&
+    (profile?.role === 'church_coordinator' ||
+     profile?.role === 'subgroup_coordinator' ||
+     (profile as any)?.is_subgroup_coordinator)
+  );
+
   // UI state
-  const [activeSection, setActiveSection] = useState(isJoyKures ? 'Pages' : isUsman ? 'Master Library' : 'Dashboard');
+  const [activeSection, setActiveSection] = useState(() => {
+    if (initialSectionFromUrl) return initialSectionFromUrl;
+    if (isJoyKures) return 'Pages';
+    if (isUsman) return 'Master Library';
+    if (isChurchAdminOnly) return 'Churches';
+    return 'Dashboard';
+  });
   const [selectedPage, setSelectedPage] = useState<PraiseNight | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -358,17 +397,27 @@ function AdminContent() {
   const fetchPrograms = useCallback(async () => {
     try {
       setLoading(true);
-      const effectiveZone = isGlobalView ? '' : `?zoneId=${selectedZoneId}`;
-      const res = await apiClient.get<{ success: boolean; data: PraiseNight[] }>(`/programs${effectiveZone}`);
+      let url = '';
+      if (isChurchScope && selectedChurchId) {
+        url = `/subgroups/${encodeURIComponent(selectedChurchId)}/praise-nights`;
+      } else if (!isGlobalView && selectedZoneId) {
+        url = `/programs?zoneId=${encodeURIComponent(selectedZoneId)}`;
+      } else {
+        url = '/programs';
+      }
+
+      const res = await apiClient.get<{ success: boolean; data: PraiseNight[] }>(url);
       if (res?.success !== false && Array.isArray(res?.data)) {
         setAllPraiseNights(res.data);
+      } else {
+        setAllPraiseNights([]);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load programs');
     } finally {
       setLoading(false);
     }
-  }, [isGlobalView, selectedZoneId]);
+  }, [isGlobalView, selectedZoneId, isChurchScope, selectedChurchId]);
 
   useEffect(() => {
     fetchPrograms();
@@ -381,50 +430,54 @@ function AdminContent() {
       return;
     }
 
-    if (Array.isArray((selectedPage as any).songs) && (selectedPage as any).songs.length > 0) {
-      setAllSongs((selectedPage as any).songs);
-    }
-
-    let isCancelled = false;
-    const loadSongsForSelectedPage = async () => {
+    const loadSongs = async () => {
       try {
-        const effectiveZone = isGlobalView ? '' : `&zoneId=${encodeURIComponent(selectedZoneId || '')}`;
-        const res = await apiClient.get<{ success: boolean; data: PraiseNightSong[] }>(
-          `/songs/praise-night?programId=${encodeURIComponent(selectedPage.id)}${effectiveZone}`
-        );
-        if (!isCancelled && res?.success !== false && Array.isArray(res?.data)) {
+        setLoading(true);
+        let url = '';
+        if (isChurchScope && selectedChurchId) {
+          url = `/subgroups/${encodeURIComponent(selectedChurchId)}/songs`;
+        } else {
+          url = `/songs/praise-night?pageId=${encodeURIComponent(selectedPage.id)}`;
+        }
+        const res = await apiClient.get<{ success: boolean; data: PraiseNightSong[] }>(url);
+        if (res?.success !== false && Array.isArray(res?.data)) {
           setAllSongs(res.data);
+        } else {
+          setAllSongs([]);
         }
       } catch (err) {
-        console.error('Error loading songs for selected page:', err);
+        console.error('Error loading songs for page:', err);
+        setAllSongs([]);
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadSongsForSelectedPage();
-    return () => {
-      isCancelled = true;
-    };
-  }, [selectedPage?.id, isGlobalView, selectedZoneId]);
+    loadSongs();
+  }, [selectedPage, isChurchScope, selectedChurchId]);
 
+  const refreshData = fetchPrograms;
+  const setZoneId = (_id?: string) => {};
   const getCurrentPage = () => selectedPage;
   const getCurrentSongs = useCallback(async (programId?: string, _flag?: boolean): Promise<PraiseNightSong[]> => {
     if (!programId) return [];
     try {
-      const effectiveZone = isGlobalView ? '' : `&zoneId=${encodeURIComponent(selectedZoneId || '')}`;
-      const res = await apiClient.get<{ success: boolean; data: PraiseNightSong[] }>(
-        `/songs/praise-night?programId=${encodeURIComponent(programId)}${effectiveZone}`
-      );
+      let url = '';
+      if (isChurchScope && selectedChurchId) {
+        url = `/subgroups/${encodeURIComponent(selectedChurchId)}/songs`;
+      } else {
+        const effectiveZone = isGlobalView ? '' : `&zoneId=${encodeURIComponent(selectedZoneId || '')}`;
+        url = `/songs/praise-night?programId=${encodeURIComponent(programId)}${effectiveZone}`;
+      }
+      const res = await apiClient.get<{ success: boolean; data: PraiseNightSong[] }>(url);
       return Array.isArray(res?.data) ? res.data : [];
     } catch (err) {
       console.error('Error loading songs for program:', err);
       return [];
     }
-  }, [isGlobalView, selectedZoneId]);
+  }, [isGlobalView, selectedZoneId, isChurchScope, selectedChurchId]);
 
-  const refreshData = fetchPrograms;
-  const setZoneId = (_id?: string) => {};
-
-  // Set zone ID when currentZone changes
+  // Set default zone if not selected
   useEffect(() => {
     if (currentZone) {
       setZoneId(currentZone.id);
@@ -433,15 +486,16 @@ function AdminContent() {
 
   // Restore Admin state from URL & auto-select fallback program
   useEffect(() => {
-    const sectionParam = searchParams.get('section');
+    const sectionParam = searchParams.get('section') || searchParams.get('tab');
     const pageIdParam = searchParams.get('pageId');
     const categoryParam = searchParams.get('category');
 
     if (sectionParam && sectionParam !== activeSection) {
       const validSections = [
         'Dashboard', 'Pages', 'Categories', 'Media', 'Library',
-        'Members', 'Notifications', 'Sub-Groups', 'Analytics',
-        'Calendar', 'Activity Logs', 'Submitted Songs', 'Support Chat', 'Payments', 'Lexicon Training', 'App Updates'
+        'Members', 'Notifications', 'Sub-Groups', 'Churches', 'Analytics',
+        'Calendar', 'Activity Logs', 'Submitted Songs', 'Support Chat', 'Payments', 'Lexicon Training', 'App Updates',
+        'Page Categories', 'Master Library', 'Schedule Manager', 'Geofence Config', 'Attendance'
       ];
       if (validSections.includes(sectionParam)) {
         setActiveSection(sectionParam);

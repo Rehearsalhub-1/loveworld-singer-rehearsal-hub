@@ -70,8 +70,16 @@ async function exchangeCodeForTokens(code: string): Promise<any> {
 function generateResponseHtml(tokens: any, origin: string | null) {
   const { access_token, refresh_token, expires_in_millis } = tokens;
 
-  if (origin === 'mobile' || origin === 'mobile-flow') {
-    const deepLink = `rehearsalhub://kingschat-callback?access_token=${access_token}&refresh_token=${refresh_token || ''}&expires_in=${expires_in_millis || ''}`;
+  if (
+    origin === 'mobile' ||
+    origin === 'mobile-flow' ||
+    origin === 'studio' ||
+    origin === 'admin' ||
+    origin === 'rehearsalhubadmin'
+  ) {
+    const isStudio = origin === 'studio' || origin === 'admin' || origin === 'rehearsalhubadmin';
+    const scheme = isStudio ? 'rehearsalhubadmin' : 'rehearsalhub';
+    const deepLink = `${scheme}://kingschat-callback?access_token=${access_token}&refresh_token=${refresh_token || ''}&expires_in=${expires_in_millis || ''}`;
     return `
       <html>
         <head>
