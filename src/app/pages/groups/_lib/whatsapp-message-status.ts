@@ -1,7 +1,4 @@
-﻿/**
- * Message status helpers — delivery/read writes deferred (no JWT message PATCH yet).
- * Subscribe kept as no-op until task 62 WebSocket.
- */
+﻿import { apiClient } from '@/lib/api-client'
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
 
@@ -14,11 +11,12 @@ export interface MessageStatusUpdate {
 
 export class WhatsAppMessageStatus {
   static async updateMessageStatus(
-    _messageId: string,
-    _status: MessageStatus,
+    messageId: string,
+    status: MessageStatus,
     _userId?: string,
   ): Promise<void> {
-    console.warn('[migration] updateMessageStatus — message status write not on JWT API yet')
+    if (status !== 'delivered' && status !== 'read') return
+    await apiClient.patch(`/chats/messages/${encodeURIComponent(messageId)}/status`, { status })
   }
 
   static async markAsDelivered(messageId: string): Promise<void> {
@@ -29,8 +27,8 @@ export class WhatsAppMessageStatus {
     await this.updateMessageStatus(messageId, 'read', userId)
   }
 
-  static async markChatAsRead(_chatId: string, _userId: string): Promise<void> {
-    console.warn('[migration] markChatAsRead — message status write not on JWT API yet')
+  static async markChatAsRead(chatId: string, _userId: string): Promise<void> {
+    await apiClient.post(`/chats/${encodeURIComponent(chatId)}/read`, {})
   }
 
   static subscribeToMessageStatus(

@@ -12,23 +12,22 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
-    if (
-      authHeader !== `Bearer ${process.env.CRON_SECRET}` &&
-      request.headers.get('x-vercel-cron') !== '1'
-    ) {
+    if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.warn(
-      '[migration] daily-reminders cron: Firestore reads removed; JWT apiClient unavailable in cron context. No reminders sent.'
-    );
+    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backendUrl || !process.env.CRON_SECRET) {
+      return NextResponse.json({ success: false, error: 'Reminder backend configuration is missing.' }, { status: 503 });
+    }
 
-    return NextResponse.json({
-      success: true,
-      message:
-        'Daily reminder cron skipped: notifications/members reads require service auth not available in this route yet.',
-      sentCount: 0,
+    const response = await fetch(`${backendUrl.replace(/\/+$/, '')}/internal/cron/daily-reminders`, {
+      method: 'POST',
+      headers: { 'x-cron-secret': process.env.CRON_SECRET },
+      cache: 'no-store',
     });
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
   } catch (error: unknown) {
     console.error('Cron job error:', error);
     const message = error instanceof Error ? error.message : 'Cron failed';

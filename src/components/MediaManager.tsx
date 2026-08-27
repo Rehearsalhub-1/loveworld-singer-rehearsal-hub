@@ -421,8 +421,10 @@ export default function MediaManager({
     if (!fileToDelete) return;
     const file = fileToDelete;
     try {
-      // Delete from Cloudinary / DB
-      await Promise.resolve();
+      const result = await apiClient.delete<{ success?: boolean; error?: string }>(`/media/${encodeURIComponent(file.id)}`);
+      if (result?.success === false) {
+        throw new Error(result.error || 'Media deletion failed');
+      }
       await loadFilesFromDatabase();
       addToast({
         type: 'success',

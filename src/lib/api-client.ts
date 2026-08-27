@@ -1,5 +1,13 @@
 const BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '').replace(/\/+$/, '');
 const REFRESH_COOKIE = 'lwsrh_refresh';
+function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'web-server';
+  const existing = localStorage.getItem('message_device_id');
+  if (existing) return existing;
+  const created = `web-${Math.random().toString(36).slice(2, 14)}`;
+  localStorage.setItem('message_device_id', created);
+  return created;
+}
 
 export class SessionExpiredError extends Error {
   constructor() {
@@ -136,13 +144,25 @@ export function getActiveScope(): ActiveScope {
 
 const apiGetCache = new Map<string, any>();
 
+function ensureMessageId(method: string, path: string, body: unknown): void {
+  if (method !== 'POST' || !/^\/chats\/[^/]+\/messages$/.test(path) || !body || typeof body !== 'object') return;
+  const messageBody = body as Record<string, unknown>;
+  if (typeof messageBody.id === 'string' && messageBody.id.trim()) return;
+  const randomUuid = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `msg_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  messageBody.id = randomUuid;
+}
+
 async function request<T>(
   method: string,
   path: string,
   body?: unknown,
   retried = false,
 ): Promise<T> {
+  ensureMessageId(method, path, body);
   const token = getAccessToken();
+  const requestDeviceId = getDeviceId();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -162,6 +182,7 @@ async function request<T>(
   if (scope.scope) {
     headers['x-scope'] = scope.scope;
   }
+  headers['x-device-id'] = requestDeviceId;
   // ─────────────────────────────────────────────────────────────────────────
 
   try {
@@ -423,19 +444,22 @@ export const BackendAPI = {
       return { success: true, data: rows.slice(0, limitCount), nextCursor: null as string | null };
     },
     getById: async (songId: string) => getDocument('master_songs', songId),
-    create: async (_data: unknown) => ({ success: false, error: 'Song create not available via Portal API yet' }),
-    update: async (_id: string, _data: unknown) => ({ success: false, error: 'Song update not available via Portal API yet' }),
-    delete: async (_id: string) => ({ success: false, error: 'Song delete not available via Portal API yet' }),
+    create: async (data: unknown) => apiClient.post<ApiEnvelope>('/master', data),
+    update: async (id: string, data: unknown) => apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(id)}`, data),
+    delete: async (id: string) => apiClient.delete<ApiEnvelope>(`/master/${encodeURIComponent(id)}`),
   },
 
   attendance: {
-    mark: async (_payload: unknown) => ({ success: false, message: 'Attendance mark not available via Portal API yet' }),
+    mark: async (payload: unknown) => apiClient.post<ApiEnvelope>('/attendance/check-in', payload),
     getByUser: async (userId: string) => {
       // API currently exposes /attendance/mine for the JWT subject only
       void userId;
       return apiClient.get<ApiEnvelope<unknown[]>>('/attendance/mine');
     },
-    getAll: async (_zoneId?: string) => apiClient.get<ApiEnvelope<unknown[]>>('/attendance/mine'),
+    getAll: async (zoneId?: string) => {
+      const query = zoneId ? `?zoneId=${encodeURIComponent(zoneId)}` : '';
+      return apiClient.get<ApiEnvelope<unknown[]>>(`/attendance${query}`);
+    },
   },
 
   generic: {
@@ -511,7 +535,7 @@ export const BackendAPI = {
   },
 
   rehearsals: {
-    list: async (zoneId?: string) => apiClient.get<ApiEnvelope<unknown[]>>(zoneId ? `/rehearsals?zoneId=${zoneId}` : '/rehearsals'),
+    list: async (zoneId?: string) => apiClient.get<ApiEnvelope<unknown[]>>(zoneId ? `/schedule?zoneId=${encodeURIComponent(zoneId)}` : '/schedule'),
     get: async (id: string) => getDocument('schedule', id),
   },
 };

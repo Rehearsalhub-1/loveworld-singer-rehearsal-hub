@@ -1,7 +1,5 @@
 "use client";
 
-const cancelSubscription = async (..._args: any[]): Promise<any> => ({ success: true });
-
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
@@ -12,8 +10,9 @@ import { useSubscription } from '@/contexts/SubscriptionContext'
 
 import { apiClient } from '@/lib/api-client';
 const SubscriptionService = {
-  getUserSubscription: async () => ({ status: 'active', tier: 'premium' }),
-  initializePayment: async (data: any) => await apiClient.post('/payments/initialize', data)
+  getUserSubscription: async (userId: string) => apiClient.get(`/subscriptions/${encodeURIComponent(userId)}`),
+  initializePayment: async (data: any) => apiClient.post('/kingspay/initialize', data),
+  cancel: async (userId: string) => apiClient.post(`/subscriptions/${encodeURIComponent(userId)}/revoke`, {})
 };
 
 import { useEffect } from 'react'
@@ -142,7 +141,7 @@ export default function SubscriptionPage() {
 
     setIsCancelling(true)
     try {
-      const result = await cancelSubscription(user.id)
+      const result = await SubscriptionService.cancel(user.id)
       if (result.success) {
         await refreshSubscription()
         setStep('plans')

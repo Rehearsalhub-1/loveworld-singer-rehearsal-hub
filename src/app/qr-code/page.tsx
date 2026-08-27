@@ -4,12 +4,21 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-import { BackendAPI } from '@/lib/api-client';
+import { apiClient } from '@/lib/api-client';
 
 const AttendanceService = {
-  getAttendanceForZone: async (..._args: any[]): Promise<any[]> => [],
-  getZoneAttendance: async (..._args: any[]): Promise<any[]> => [],
-  checkIn: async (..._args: any[]): Promise<any> => ({ success: true })
+  getAttendanceForZone: async (zoneId?: string): Promise<any[]> => {
+    const query = zoneId ? `?zoneId=${encodeURIComponent(zoneId)}` : '';
+    const result = await apiClient.get<{ data?: any[] }>(`/attendance${query}`);
+    return result.data || [];
+  },
+  getZoneAttendance: async (zoneId?: string): Promise<any[]> => {
+    const query = zoneId ? `?zoneId=${encodeURIComponent(zoneId)}` : '';
+    const result = await apiClient.get<{ data?: any[] }>(`/attendance${query}`);
+    return result.data || [];
+  },
+  checkIn: async (adminId: string, qrCode: string, eventName: string, zoneId?: string): Promise<any> =>
+    apiClient.post('/attendance/check-in', { recordedBy: adminId, qrCode, eventName, zoneId })
 };
 
 

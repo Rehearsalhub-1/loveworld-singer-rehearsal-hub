@@ -335,18 +335,21 @@ export function useRealtimeNotifications() {
 export function useNotificationActions() {
   const zoneId = useNotificationStore((s) => s._currentZoneId) || ''
 
-  const createNotificationForAll = async (_data: {
+  const createNotificationForAll = async (data: {
     title: string
     message: string
     type: string
     category: string
     priority: string
   }) => {
-    console.warn('[migration] createNotificationForAll — notifications write not on JWT API yet', zoneId)
-    return { success: false, error: 'Notification create not available via API yet' }
+    return apiClient.post('/notifications/broadcast', {
+      ...data,
+      targetAudience: 'all',
+      targetZoneId: zoneId || null,
+    })
   }
 
-  const createNotificationForGroup = async (_data: {
+  const createNotificationForGroup = async (data: {
     title: string
     message: string
     groupName: string
@@ -354,8 +357,12 @@ export function useNotificationActions() {
     category: string
     priority: string
   }) => {
-    console.warn('[migration] createNotificationForGroup — notifications write not on JWT API yet', zoneId)
-    return { success: false, error: 'Notification create not available via API yet' }
+    return apiClient.post('/notifications/broadcast', {
+      ...data,
+      targetAudience: 'group',
+      targetGroup: data.groupName,
+      targetZoneId: zoneId || null,
+    })
   }
 
   return { createNotificationForAll, createNotificationForGroup }
