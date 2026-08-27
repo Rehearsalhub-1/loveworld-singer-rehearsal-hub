@@ -99,7 +99,6 @@ export default function MediaManager({
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<MediaFile | null>(null);
-  const [runningDiagnostics, setRunningDiagnostics] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [mediaPage, setMediaPage] = useState(1);
@@ -450,47 +449,6 @@ export default function MediaManager({
       type: 'success',
       message: 'URL copied to clipboard!'
     });
-  };
-
-  const handleRunDiagnostics = async () => {
-    setRunningDiagnostics(true);
-    addToast({
-      type: 'info',
-      message: 'Running diagnostics... Check console for results'
-    });
-
-    try {
-      const results = await runMediaDiagnostics();
-      printDiagnostics(results);
-
-      const failed = results.filter((r: DiagnosticResult) => r.status === 'fail').length;
-      const warnings = results.filter((r: DiagnosticResult) => r.status === 'warning').length;
-
-      if (failed > 0) {
-        addToast({
-          type: 'error',
-          message: `Diagnostics complete: ${failed} test(s) failed. Check console for details.`
-        });
-      } else if (warnings > 0) {
-        addToast({
-          type: 'warning',
-          message: `Diagnostics complete: ${warnings} warning(s). Check console for details.`
-        });
-      } else {
-        addToast({
-          type: 'success',
-          message: 'All diagnostics passed! '
-        });
-      }
-    } catch (error) {
- console.error('Diagnostics error:', error);
-      addToast({
-        type: 'error',
-        message: 'Failed to run diagnostics'
-      });
-    } finally {
-      setRunningDiagnostics(false);
-    }
   };
 
   const handleAudioPlay = async (file: MediaFile) => {

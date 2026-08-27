@@ -1,4 +1,5 @@
 // AudioLab Types - Complete Data Models
+type Timestamp = { toDate?: () => Date };
 
 // VOCAL PARTS & AUDIO
 

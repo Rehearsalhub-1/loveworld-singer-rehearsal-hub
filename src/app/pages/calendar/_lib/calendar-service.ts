@@ -148,7 +148,7 @@ export class CalendarService {
       date: event.start.toISOString(),
       endDate: event.end.toISOString(),
       location: event.location,
-      type: event.type === 'performance' ? 'event' : event.type,
+      type: event.type === 'performance' || event.type === 'other' ? 'event' : event.type,
       showInCarousel: true,
       isGlobal: event.isGlobal,
       zoneId: event.zoneId,
@@ -163,7 +163,7 @@ export class CalendarService {
       ...(updates.start !== undefined ? { date: updates.start.toISOString() } : {}),
       ...(updates.end !== undefined ? { endDate: updates.end.toISOString() } : {}),
       ...(updates.location !== undefined ? { location: updates.location } : {}),
-      ...(updates.type !== undefined ? { type: updates.type === 'performance' ? 'event' : updates.type } : {}),
+      ...(updates.type !== undefined ? { type: updates.type === 'performance' || updates.type === 'other' ? 'event' : updates.type } : {}),
       ...(updates.isGlobal !== undefined ? { isGlobal: updates.isGlobal } : {}),
       ...(updates.zoneId !== undefined ? { zoneId: updates.zoneId } : {}),
     }

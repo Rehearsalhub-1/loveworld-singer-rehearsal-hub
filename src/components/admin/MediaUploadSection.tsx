@@ -309,16 +309,16 @@ export default function MediaUploadSection() {
       if (editingItem) {
         // Update
         const res = await apiClient.media.update(editingItem.id, payload);
-        const updated = (res && res.data) ? res.data : { ...editingItem, ...payload, updatedAt: new Date().toISOString() };
+        const updated: MediaItem = (res && res.data ? res.data : { ...editingItem, ...payload, updatedAt: new Date().toISOString() }) as MediaItem;
         setMediaItems(prev => prev.map(m => m.id === editingItem.id ? updated : m));
       } else {
         // Create
         const res = await apiClient.media.create(payload);
-        const created = (res && res.data) ? res.data : {
-          id: res?.id || `media_${Date.now()}`,
+        const created: MediaItem = (res && res.data ? res.data : {
+          id: (res?.data as { id?: string } | undefined)?.id || `media_${Date.now()}`,
           ...payload,
           createdAt: new Date().toISOString(),
-        };
+        }) as MediaItem;
         setMediaItems(prev => [created, ...(Array.isArray(prev) ? prev : [])]);
       }
       setShowModal(false);

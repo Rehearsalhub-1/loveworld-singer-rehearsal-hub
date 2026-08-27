@@ -49,7 +49,7 @@ export const adminApi = {
   },
   programs: {
     list: (scope?: { zoneId?: string | null; churchId?: string | null }) => {
-      if (scope?.churchId) return request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(`/subgroups/${encodeURIComponent(scope.churchId)}/praise-nights`))
+      if (scope?.churchId) return request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(`/subgroups/${encodeURIComponent(scope.churchId as string)}/praise-nights`))
       const query = scope?.zoneId ? `?zoneId=${encodeURIComponent(scope.zoneId)}` : ''
       return request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(`/programs${query}`))
     },
@@ -76,7 +76,7 @@ export const adminApi = {
   },
   songs: {
     list: (options: { programId?: string; pageId?: string; zoneId?: string | null; churchId?: string | null } = {}) => {
-      if (options.churchId) return request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(`/subgroups/${encodeURIComponent(options.churchId)}/songs`))
+      if (options.churchId) return request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(`/subgroups/${encodeURIComponent(options.churchId as string)}/songs`))
       const params = new URLSearchParams()
       if (options.programId) params.set('programId', options.programId)
       if (options.pageId) params.set('pageId', options.pageId)

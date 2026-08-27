@@ -223,7 +223,7 @@ export async function updateSong(
   songId: string,
   updates: Partial<Omit<AudioLabSong, 'id' | 'createdAt' | 'createdBy'>>
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`, updates);
+  const response = await apiClient.patch<ApiEnvelope<unknown>>(`/master/${encodeURIComponent(songId)}`, updates);
   return { success: response?.success !== false, error: response?.error };
 }
 
@@ -231,7 +231,7 @@ export async function updateSong(
  * Delete a song
  */
 export async function deleteSong(songId: string): Promise<{ success: boolean; error?: string }> {
-  const response = await apiClient.delete<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`);
+  const response = await apiClient.delete<ApiEnvelope<unknown>>(`/master/${encodeURIComponent(songId)}`);
   return { success: response?.success !== false, error: response?.error };
 }
 
@@ -247,7 +247,7 @@ export async function updateSongAudioPart(
 ): Promise<{ success: boolean; error?: string }> {
   const song = await getSongById(songId);
   if (!song) return { success: false, error: 'Song not found' };
-  const response = await apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`, {
+  const response = await apiClient.patch<ApiEnvelope<unknown>>(`/master/${encodeURIComponent(songId)}`, {
     audioUrls: { ...song.audioUrls, [part]: url },
   });
   return { success: response?.success !== false, error: response?.error };
@@ -266,7 +266,7 @@ export async function removeSongAudioPart(
     if (!song) return { success: false, error: 'Song not found' };
     const audioUrls = { ...song.audioUrls };
     delete audioUrls[part];
-    const response = await apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`, { audioUrls });
+    const response = await apiClient.patch<ApiEnvelope<unknown>>(`/master/${encodeURIComponent(songId)}`, { audioUrls });
     return { success: response?.success !== false, error: response?.error };
   } catch (error) {
  console.error('[SongService] Error removing audio part:', error);
@@ -286,7 +286,7 @@ export async function updateSongLyrics(
   songId: string,
   lyrics: LyricLine[]
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await apiClient.patch<ApiEnvelope>(`/songs/${encodeURIComponent(songId)}/lyrics`, { lyrics });
+  const response = await apiClient.patch<ApiEnvelope<unknown>>(`/songs/${encodeURIComponent(songId)}/lyrics`, { lyrics });
   return { success: response?.success !== false, error: response?.error };
 }
 
