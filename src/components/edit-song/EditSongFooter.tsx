@@ -9,7 +9,6 @@ interface EditSongFooterProps {
   onUpdate: () => void;
   onClose: () => void;
   onViewHistory: () => void;
-  isFirebaseConfigured: boolean;
   historyEntriesCount: number;
   theme: any;
 }
@@ -19,7 +18,6 @@ export const EditSongFooter: React.FC<EditSongFooterProps> = ({
   onUpdate,
   onClose,
   onViewHistory,
-  isFirebaseConfigured,
   historyEntriesCount,
   theme
 }) => {
@@ -36,22 +34,13 @@ export const EditSongFooter: React.FC<EditSongFooterProps> = ({
       <div className="flex flex-col sm:flex-row gap-3">
         <button
           onClick={onViewHistory}
-          className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors font-medium relative ${!isFirebaseConfigured
-            ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-            : `${theme.primary} text-white ${theme.primaryHover}`
-            }`}
-          disabled={!isFirebaseConfigured}
+          className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors font-medium relative ${theme.primary} text-white ${theme.primaryHover}`}
         >
           <History className="w-4 h-4" />
           <span className="text-sm sm:text-base">View History</span>
-          {historyEntriesCount > 0 && isFirebaseConfigured && (
+          {historyEntriesCount > 0 && (
             <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
               {historyEntriesCount}
-            </span>
-          )}
-          {!isFirebaseConfigured && (
-            <span className="absolute -top-2 -right-2 bg-yellow-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" title="Firebase not configured">
-              ⚠️
             </span>
           )}
         </button>

@@ -68,7 +68,19 @@ export const adminApi = {
     create: (payload: unknown) => request(() => apiClient.post<DataResponse>('/categories', payload)),
     update: (id: string, payload: unknown) => request(() => apiClient.patch<DataResponse>(`/categories/${encodeURIComponent(id)}`, payload)),
     remove: (id: string) => request(() => apiClient.delete<ApiResponse>(`/categories/${encodeURIComponent(id)}`)),
-    pageList: (zoneId?: string | null) => request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(zoneId && zoneId !== 'zone-001' && !zoneId.toLowerCase().includes('hq') ? `/categories/zone-page?zoneId=${encodeURIComponent(zoneId)}` : '/categories/page')),
+    pageList: (zoneId?: string | null) => {
+      const isExternalZone = Boolean(
+        zoneId &&
+        zoneId !== 'all' &&
+        zoneId !== 'global' &&
+        zoneId !== 'zone-001' &&
+        zoneId !== 'ZONE001' &&
+        !zoneId.toLowerCase().includes('hq')
+      );
+      return request(() => apiClient.get<{ success?: boolean; data?: Record<string, unknown>[]; error?: string }>(
+        isExternalZone ? `/categories/zone-page?zoneId=${encodeURIComponent(zoneId as string)}` : '/categories/page'
+      ));
+    },
     pageCreate: (payload: unknown) => request(() => apiClient.post<IdResponse>('/categories/page', payload)),
     pageUpdate: (id: string, payload: unknown) => request(() => apiClient.patch<DataResponse>(`/categories/page/${encodeURIComponent(id)}`, payload)),
     pageRemove: (id: string) => request(() => apiClient.delete<ApiResponse>(`/categories/page/${encodeURIComponent(id)}`)),

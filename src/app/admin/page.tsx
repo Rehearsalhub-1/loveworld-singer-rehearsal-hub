@@ -504,13 +504,20 @@ function AdminContent() {
 
   // Keep selectedPage in sync with latest allPraiseNights data
   useEffect(() => {
-    if (selectedPage && allPraiseNights.length > 0) {
-      const updatedPage = allPraiseNights.find(p => p.id === selectedPage.id);
-      if (updatedPage && JSON.stringify(updatedPage) !== JSON.stringify(selectedPage)) {
-        setSelectedPage(updatedPage);
+    if (allPraiseNights.length > 0) {
+      if (!selectedPage || !allPraiseNights.some(p => p.id === selectedPage.id)) {
+        setSelectedPage(allPraiseNights[0]);
+      } else {
+        const updatedPage = allPraiseNights.find(p => p.id === selectedPage.id);
+        if (updatedPage && JSON.stringify(updatedPage) !== JSON.stringify(selectedPage)) {
+          setSelectedPage(updatedPage);
+        }
       }
+    } else {
+      setSelectedPage(null);
+      setAllSongs([]);
     }
-  }, [allPraiseNights, selectedPage?.id]);
+  }, [allPraiseNights]);
 
 
 
@@ -1002,7 +1009,8 @@ function AdminContent() {
         updatedAt: new Date()
       };
 
-      const result = await ZoneDatabaseService.createPageCategory(currentZone.id, newPageCategoryData);
+      const activeTargetZone = isChurchScope ? selectedChurchId : isGlobalView ? 'all' : (selectedZoneId || currentZone?.id);
+      const result = await ZoneDatabaseService.createPageCategory(activeTargetZone || currentZone.id, newPageCategoryData);
 
       if (result.success) {
         addToast({
@@ -1011,7 +1019,7 @@ function AdminContent() {
         });
 
         // Reload page categories from database
-        const categories = await ZoneDatabaseService.getPageCategories(currentZone.id);
+        const categories = await ZoneDatabaseService.getPageCategories(activeTargetZone || undefined);
         setPageCategories(categories);
 
         setNewPageCategoryName('');
@@ -1123,7 +1131,8 @@ function AdminContent() {
         updatedAt: new Date()
       };
 
-      const result = await ZoneDatabaseService.updatePageCategory(currentZone.id, editingPageCategory.id, updatedData);
+      const activeTargetZone = isChurchScope ? selectedChurchId : isGlobalView ? 'all' : (selectedZoneId || currentZone?.id);
+      const result = await ZoneDatabaseService.updatePageCategory(activeTargetZone || currentZone.id, editingPageCategory.id, updatedData);
 
       if (result.success) {
         addToast({
@@ -1132,7 +1141,7 @@ function AdminContent() {
         });
 
         // Reload page categories from database
-        const categories = await ZoneDatabaseService.getPageCategories(currentZone.id);
+        const categories = await ZoneDatabaseService.getPageCategories(activeTargetZone || undefined);
         setPageCategories(categories);
 
         setEditingPageCategory(null);
@@ -1180,8 +1189,8 @@ function AdminContent() {
     if (!pageCategoryToDelete) return;
 
     try {
-
-      const result = await ZoneDatabaseService.deletePageCategory(currentZone.id, pageCategoryToDelete.id);
+      const activeTargetZone = isChurchScope ? selectedChurchId : isGlobalView ? 'all' : (selectedZoneId || currentZone?.id);
+      const result = await ZoneDatabaseService.deletePageCategory(activeTargetZone || currentZone.id, pageCategoryToDelete.id);
 
       if (result.success) {
         addToast({
@@ -1190,7 +1199,7 @@ function AdminContent() {
         });
 
         // Reload page categories from database
-        const categories = await ZoneDatabaseService.getPageCategories(currentZone.id);
+        const categories = await ZoneDatabaseService.getPageCategories(activeTargetZone || undefined);
         setPageCategories(categories);
 
         setShowDeletePageCategoryDialog(false);

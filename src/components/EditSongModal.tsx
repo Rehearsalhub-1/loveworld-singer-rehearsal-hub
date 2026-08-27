@@ -131,7 +131,6 @@ export default function EditSongModal({
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
   const [showHistoryList, setShowHistoryList] = useState(false);
   const [originalHistoryValues, setOriginalHistoryValues] = useState({ old_value: '', new_value: '' });
-  const isFirebaseConfigured = !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
   // History logic
   const handleCreateHistory = (type: 'song-details' | 'personnel' | 'music-details' | 'lyrics' | 'solfas' | 'notation' | 'audio' | 'comments') => {
@@ -155,13 +154,18 @@ export default function EditSongModal({
   };
 
   const loadHistoryEntries = useCallback(async () => {
-    if (!song?.id) {
+    const sid = song?.id || (song as any)?.firebaseId;
+    if (!sid && !song?.title) {
       setHistoryEntries([]);
       return;
     }
     try {
+      const params = new URLSearchParams();
+      if (sid) params.append('songId', String(sid));
+      if (song?.title) params.append('title', song.title);
+
       const res = await apiClient.get<{ success: boolean; data: any[] }>(
-        `/songs/history?songId=${encodeURIComponent(song.id)}`
+        `/songs/history?${params.toString()}`
       );
       if (res?.success && Array.isArray(res?.data)) {
         setHistoryEntries(res.data);
@@ -172,13 +176,13 @@ export default function EditSongModal({
       console.error('Error loading history entries:', err);
       setHistoryEntries([]);
     }
-  }, [song?.id]);
+  }, [song?.id, (song as any)?.firebaseId, song?.title]);
 
   useEffect(() => {
-    if (isOpen && song?.id) {
+    if (isOpen && (song?.id || (song as any)?.firebaseId || song?.title)) {
       loadHistoryEntries();
     }
-  }, [isOpen, song?.id, loadHistoryEntries]);
+  }, [isOpen, song?.id, (song as any)?.firebaseId, song?.title, loadHistoryEntries]);
 
   const handleSaveHistory = async () => {
     if (!song?.id) return;
@@ -600,11 +604,9 @@ export default function EditSongModal({
             onUpdate={handleUpdate}
             onClose={onClose}
             onViewHistory={() => {
-              if (!isFirebaseConfigured) return;
               loadHistoryEntries();
               setShowHistoryList(true);
             }}
-            isFirebaseConfigured={isFirebaseConfigured}
             historyEntriesCount={historyEntries.length}
             theme={theme}
           />
