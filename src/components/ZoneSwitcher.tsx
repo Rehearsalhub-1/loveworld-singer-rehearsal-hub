@@ -135,14 +135,14 @@ export default function ZoneSwitcher() {
         <button
           onClick={() => { setIsOpen(!isOpen); setJoinMessage(null); }}
           disabled={isSwitching}
-          className="flex items-center gap-2.5 px-3.5 py-1.5 bg-white dark:bg-zinc-800 backdrop-blur-md border border-gray-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 group hover:border-purple-500/50"
+          className="flex items-center gap-2.5 px-3.5 py-1.5 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 group hover:border-purple-500/50"
         >
           <div
             className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm ring-2 ring-purple-400/30"
             style={{ backgroundColor: currentZone.themeColor || '#9333EA' }}
           />
           <div className="text-left flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-gray-800 dark:text-gray-100 max-w-[140px] sm:max-w-[180px] truncate">
+            <span className="text-xs font-semibold text-gray-800 max-w-[140px] sm:max-w-[180px] truncate">
               {currentZone.name}
             </span>
           </div>
@@ -157,17 +157,17 @@ export default function ZoneSwitcher() {
               onClick={() => { setIsOpen(false); setSearchQuery(''); setJoinMessage(null); }}
             />
 
-            <div className="absolute top-full left-0 mt-2 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-zinc-800 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute top-full left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
               {/* Active Badge Header */}
-              <div className="p-3.5 border-b border-gray-100 dark:border-zinc-800 bg-gradient-to-r from-purple-50/70 to-indigo-50/70 dark:from-purple-950/30 dark:to-indigo-950/30">
+              <div className="p-3.5 border-b border-gray-100 bg-gradient-to-r from-purple-50/70 to-indigo-50/70">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Building className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                    <Building className="w-4 h-4 text-purple-600" />
+                    <span className="text-xs font-bold text-gray-900">
                       {isSuperAdmin ? 'All Zones & HQ Groups' : 'Your Joined Zones & Groups'}
                     </span>
                   </div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
                     {userZones.length} Joined
                   </span>
                 </div>
@@ -180,7 +180,7 @@ export default function ZoneSwitcher() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search joined groups..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-gray-900 placeholder-gray-400"
                     autoFocus
                   />
                 </div>
@@ -206,8 +206,8 @@ export default function ZoneSwitcher() {
                             <button
                               key={zone.id}
                               onClick={() => handleZoneSwitch(zone.id)}
-                              className={`w-full px-3 py-2 flex items-center gap-3 rounded-xl hover:bg-gray-100/80 dark:hover:bg-zinc-800 transition-colors text-left ${
-                                isSelected ? 'bg-purple-50 dark:bg-purple-950/40 font-semibold' : ''
+                              className={`w-full px-3 py-2 flex items-center gap-3 rounded-xl hover:bg-gray-100/80 transition-colors text-left ${
+                                isSelected ? 'bg-purple-50 font-semibold' : ''
                               }`}
                             >
                               <div
@@ -215,7 +215,7 @@ export default function ZoneSwitcher() {
                                 style={{ backgroundColor: zone.themeColor || '#9333EA' }}
                               />
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs truncate ${isSelected ? 'text-purple-700 dark:text-purple-300 font-bold' : 'text-gray-900 dark:text-gray-100'}`}>
+                                <p className={`text-xs truncate ${isSelected ? 'text-purple-700 font-bold' : 'text-gray-900'}`}>
                                   {zone.name}
                                 </p>
                                 <p className="text-[10px] text-gray-400 truncate">
@@ -245,8 +245,8 @@ export default function ZoneSwitcher() {
                             <button
                               key={zone.id}
                               onClick={() => handleZoneSwitch(zone.id)}
-                              className={`w-full px-3 py-2 flex items-center gap-3 rounded-xl hover:bg-gray-100/80 dark:hover:bg-zinc-800 transition-colors text-left ${
-                                isSelected ? 'bg-purple-50 dark:bg-purple-950/40 font-semibold' : ''
+                              className={`w-full px-3 py-2 flex items-center gap-3 rounded-xl hover:bg-gray-100/80 transition-colors text-left ${
+                                isSelected ? 'bg-purple-50 font-semibold' : ''
                               }`}
                             >
                               <div
@@ -254,7 +254,7 @@ export default function ZoneSwitcher() {
                                 style={{ backgroundColor: zone.themeColor || '#10B981' }}
                               />
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs truncate ${isSelected ? 'text-purple-700 dark:text-purple-300 font-bold' : 'text-gray-900 dark:text-gray-100'}`}>
+                                <p className={`text-xs truncate ${isSelected ? 'text-purple-700 font-bold' : 'text-gray-900'}`}>
                                   {zone.name}
                                 </p>
                                 <p className="text-[10px] text-gray-400 truncate">
@@ -276,8 +276,8 @@ export default function ZoneSwitcher() {
               </div>
 
               {/* Inline Join Another Zone Input (matches rehearsalhubv2 SettingsScreen) */}
-              <div className="p-3 border-t border-gray-100 dark:border-zinc-800 bg-gray-50/70 dark:bg-zinc-800/40">
-                <p className="text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+              <div className="p-3 border-t border-gray-100 bg-gray-50/70">
+                <p className="text-[11px] font-bold text-gray-700 mb-1.5">
                   Join Another Zone or HQ Group
                 </p>
                 <form onSubmit={handleJoinZone} className="flex gap-2">
@@ -287,7 +287,7 @@ export default function ZoneSwitcher() {
                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                     placeholder="Enter invitation code (e.g. BLWZN1)"
                     maxLength={15}
-                    className="flex-1 px-3 py-1.5 text-xs uppercase bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-gray-900 dark:text-gray-100 placeholder-gray-400 font-medium tracking-wide"
+                    className="flex-1 px-3 py-1.5 text-xs uppercase bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/40 text-gray-900 placeholder-gray-400 font-medium tracking-wide"
                   />
                   <button
                     type="submit"
@@ -299,7 +299,7 @@ export default function ZoneSwitcher() {
                 </form>
 
                 {joinMessage && (
-                  <p className={`mt-1.5 text-[11px] font-medium ${joinMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                  <p className={`mt-1.5 text-[11px] font-medium ${joinMessage.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
                     {joinMessage.text}
                   </p>
                 )}

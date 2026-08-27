@@ -532,7 +532,7 @@ function HomePageContent() {
               <HeroCarousel />
 
               {/* Title Section */}
-              <div className="text-left mb-4">
+              <div className="text-center mb-4">
                 <h1 className="text-1xl font-bold text-gray-800">LoveWorld Singers Rehearsal Hub Portal</h1>
               </div>
 
