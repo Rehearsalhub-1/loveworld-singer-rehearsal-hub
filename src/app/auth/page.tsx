@@ -443,6 +443,7 @@ function AuthPageContent() {
     try {
       const res = await apiClient.post<{ success: boolean; error?: string }>('/auth/reset-password', {
         email: forgotEmail.trim().toLowerCase(),
+        otp: forgotOtp.trim(),
         newPassword: forgotNewPassword,
       });
       if (res.success) {
