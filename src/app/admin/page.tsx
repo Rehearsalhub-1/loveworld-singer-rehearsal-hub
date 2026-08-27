@@ -555,12 +555,10 @@ function AdminContent() {
       try {
         const categories = await ZoneDatabaseService.getCategories(targetZone || undefined);
 
-        // Map categories to include both Firebase ID and Supabase ID
+        // Keep the API identifier stable for category updates.
         const mappedCategories = categories.map((category: any) => ({
           ...category,
-          firebaseId: category.id, // Firebase document ID (string)
-          id: category.id, // Keep Firebase ID as primary ID
-          supabaseId: category.id // This will be the Firebase ID for now
+          id: category.id,
         }));
 
         setDbCategories(mappedCategories as any);
@@ -590,7 +588,7 @@ function AdminContent() {
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
 
   useEffect(() => {
-    // Wait for Firebase auth to finish loading first
+    // Wait for API auth to finish loading first
     if (authLoading) {
       return
     }
@@ -865,7 +863,7 @@ function AdminContent() {
         updatedAt: new Date().toISOString()
       };
 
-      // Use the Firebase document ID directly
+      // Use the API document ID directly
       const result = await ZoneDatabaseService.updateCategory(currentZone.id, editingCategory.id, updateData);
 
       if (result.success) {
@@ -933,7 +931,7 @@ function AdminContent() {
 
     try {
 
-      // Use the Firebase document ID directly
+      // Use the API document ID directly
       const result = await ZoneDatabaseService.deleteCategory(currentZone.id, categoryToDelete.id);
 
       if (result.success) {
@@ -1238,7 +1236,7 @@ function AdminContent() {
     setIsCreatingPage(true);
 
     try {
-      // Create the page first to get a Firebase-generated ID for banner upload
+      // Create the page first to get an API-generated ID for banner upload
       const newPage: Omit<PraiseNight, 'id'> = {
         name: newPageName.trim(),
         date: newPageDate.trim(),
@@ -1345,7 +1343,7 @@ function AdminContent() {
 
       // Upload banner image if a new file was selected
       if (newPageBannerFile) {
-        const uploadResult = await uploadBannerImage(newPageBannerFile, (editingPage as any).firebaseId || editingPage.id.toString());
+        const uploadResult = await uploadBannerImage(newPageBannerFile, editingPage.id.toString());
         if (uploadResult.success && uploadResult.url) {
           bannerImageUrl = uploadResult.url;
         } else {
@@ -1371,7 +1369,7 @@ function AdminContent() {
       };
 
       const result = await ZoneDatabaseService.updatePraiseNight(
-        (editingPage as any).firebaseId || editingPage.id.toString(),
+        editingPage.id.toString(),
         pageData,
         currentZone?.id
       );
@@ -1390,10 +1388,10 @@ function AdminContent() {
         };
 
         setAllPraiseNights(prev =>
-          prev.map(p => (p.id === editingPage.id || (p as any).firebaseId === (editingPage as any).firebaseId ? { ...p, ...updatedPageObj } : p))
+          prev.map(p => (p.id === editingPage.id ? { ...p, ...updatedPageObj } : p))
         );
 
-        if (selectedPage?.id === editingPage.id || (selectedPage as any)?.firebaseId === (editingPage as any)?.firebaseId) {
+        if (selectedPage?.id === editingPage.id) {
           setSelectedPage((prev: any) => prev ? { ...prev, ...updatedPageObj } : prev);
         }
 
@@ -1438,7 +1436,7 @@ function AdminContent() {
 
     try {
       const result = await ZoneDatabaseService.deletePraiseNight(
-        (pageToDelete as any).firebaseId || pageToDelete.id.toString(),
+        pageToDelete.id.toString(),
         currentZone?.id
       );
 
@@ -1452,10 +1450,10 @@ function AdminContent() {
         
         // Smooth in-place state sync
         setAllPraiseNights(prev =>
-          prev.filter(p => p.id !== pageToDelete.id && (p as any).firebaseId !== (pageToDelete as any).firebaseId)
+          prev.filter(p => p.id !== pageToDelete.id)
         );
 
-        if (selectedPage?.id === pageToDelete.id || (selectedPage as any)?.firebaseId === (pageToDelete as any)?.firebaseId) {
+        if (selectedPage?.id === pageToDelete.id) {
           setSelectedPage(null);
         }
 
