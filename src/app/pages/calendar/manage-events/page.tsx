@@ -15,7 +15,6 @@ export default function ManageEventsPage() {
   const router = useRouter()
 
   const isAuthorized = profile?.role === 'admin' ||
-    profile?.role === 'boss' ||
     profile?.administration === 'Coordinator' ||
     profile?.administration === 'Assistant Coordinator'
 

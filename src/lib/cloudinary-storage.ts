@@ -27,18 +27,6 @@ export async function uploadToCloudinary(file: File, onProgress?: (progress: num
     });
 
     if (!response.ok) {
-      // Fallback to public upload if token was missing or expired
-      if (response.status === 401) {
-        const publicRes = await fetch(`${BACKEND_URL}/api/upload/public`, {
-          method: 'POST',
-          body: formData,
-        });
-        if (publicRes.ok) {
-          const publicData = await publicRes.json();
-          if (onProgress) onProgress(100);
-          return publicData.data?.url || publicData.url;
-        }
-      }
       throw new Error(`Upload Failed: HTTP ${response.status}`);
     }
 

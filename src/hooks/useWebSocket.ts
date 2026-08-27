@@ -148,9 +148,13 @@ export function subscribe(resource: string, id: string, handler: EventHandler): 
     );
     if (!subscriptions.some((s) => s.resource === resource && s.id === id) &&
         socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: 'unsubscribe', resource, id }));
+      const activeSocket = socket;
+      if (!activeSocket || activeSocket.readyState !== WebSocket.OPEN) return;
+      activeSocket.send(JSON.stringify({ type: 'unsubscribe', resource, id }));
       (RESOURCE_ALIASES[resource] || []).forEach((alias) => {
-        socket.send(JSON.stringify({ type: 'unsubscribe', resource: alias, id }));
+        if (activeSocket.readyState === WebSocket.OPEN) {
+          activeSocket.send(JSON.stringify({ type: 'unsubscribe', resource: alias, id }));
+        }
       });
     }
   };

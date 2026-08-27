@@ -84,26 +84,41 @@ export const getSystemPlaylistId = (userId: string, type: 'liked' | 'watch_later
 
 // Ensure system playlists exist for user
 export async function ensureSystemPlaylists(userId: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: ensureSystemPlaylists — no JWT write route yet');
-  void userId;
+  const playlists = await fetchMyPlaylists(userId)
+  for (const systemType of ['liked', 'watch_later'] as const) {
+    const id = getSystemPlaylistId(userId, systemType)
+    if (!playlists.some((playlist) => playlist.id === id)) {
+      await apiClient.post('/playlists', {
+        id,
+        title: systemType === 'liked' ? 'Liked Videos' : 'Watch Later',
+        name: systemType === 'liked' ? 'Liked Videos' : 'Watch Later',
+        isPublic: false,
+        songIds: [],
+      })
+    }
+  }
 }
 
 // Toggle like on a video
 export async function toggleLikeVideo(userId: string, videoId: string, thumbnail?: string): Promise<boolean> {
-  console.warn('[migration] playlist-service.ts: toggleLikeVideo — no JWT write route yet');
-  void userId;
-  void videoId;
   void thumbnail;
-  return false;
+  await ensureSystemPlaylists(userId)
+  const playlistId = getSystemPlaylistId(userId, 'liked')
+  const liked = await isVideoLiked(userId, videoId)
+  if (liked) await removeFromPlaylist(playlistId, videoId)
+  else await addToPlaylist(playlistId, videoId)
+  return !liked
 }
 
 // Toggle watch later on a video
 export async function toggleWatchLater(userId: string, videoId: string, thumbnail?: string): Promise<boolean> {
-  console.warn('[migration] playlist-service.ts: toggleWatchLater — no JWT write route yet');
-  void userId;
-  void videoId;
   void thumbnail;
-  return false;
+  await ensureSystemPlaylists(userId)
+  const playlistId = getSystemPlaylistId(userId, 'watch_later')
+  const saved = await isInWatchLater(userId, videoId)
+  if (saved) await removeFromPlaylist(playlistId, videoId)
+  else await addToPlaylist(playlistId, videoId)
+  return !saved
 }
 
 export async function isVideoLiked(userId: string, videoId: string): Promise<boolean> {
@@ -126,13 +141,16 @@ export async function createPlaylist(
   isPublic: boolean = false,
   type?: string // Category type
 ): Promise<string> {
-  console.warn('[migration] playlist-service.ts: createPlaylist — no JWT write route yet');
-  void userId;
-  void name;
-  void description;
-  void isPublic;
-  void type;
-  return '';
+  void userId
+  const response = await apiClient.post<{ success?: boolean; data?: { id?: string }; error?: string }>('/playlists', {
+    name,
+    title: name,
+    description,
+    isPublic,
+    type,
+  })
+  if (response.success === false || !response.data?.id) throw new Error(response.error || 'Failed to create playlist')
+  return response.data.id
 }
 
 // Get user's playlists
@@ -149,8 +167,8 @@ export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
 // Get single playlist
 export async function getPlaylist(playlistId: string): Promise<Playlist | null> {
   try {
-    const playlists = await fetchMyPlaylists()
-    return playlists.find((p) => p.id === playlistId) || null
+    const response = await apiClient.get<{ success?: boolean; data?: Record<string, unknown>; error?: string }>(`/playlists/${encodeURIComponent(playlistId)}`)
+    return response.success === false || !response.data ? null : mapPlaylistRow(response.data)
   } catch (error) {
     console.error(' Error getting playlist:', error)
     return null
@@ -159,32 +177,29 @@ export async function getPlaylist(playlistId: string): Promise<Playlist | null> 
 
 // Add video to playlist
 export async function addToPlaylist(playlistId: string, videoId: string, thumbnail?: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: addToPlaylist — no JWT write route yet');
-  void playlistId;
-  void videoId;
   void thumbnail;
+  const response = await apiClient.post<{ success?: boolean; error?: string }>(`/playlists/${encodeURIComponent(playlistId)}/songs`, { songId: videoId })
+  if (response.success === false) throw new Error(response.error || 'Failed to add video to playlist')
 }
 
 // Remove video from playlist
 export async function removeFromPlaylist(playlistId: string, videoId: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: removeFromPlaylist — no JWT write route yet');
-  void playlistId;
-  void videoId;
+  const response = await apiClient.delete<{ success?: boolean; error?: string }>(`/playlists/${encodeURIComponent(playlistId)}/songs/${encodeURIComponent(videoId)}`)
+  if (response.success === false) throw new Error(response.error || 'Failed to remove video from playlist')
 }
 
 export async function updatePlaylist(
   playlistId: string,
   data: { name?: string; description?: string; isPublic?: boolean; type?: string }
 ): Promise<void> {
-  console.warn('[migration] playlist-service.ts: updatePlaylist — no JWT write route yet');
-  void playlistId;
-  void data;
+  const response = await apiClient.patch<{ success?: boolean; error?: string }>(`/playlists/${encodeURIComponent(playlistId)}`, data)
+  if (response.success === false) throw new Error(response.error || 'Failed to update playlist')
 }
 
 // Delete playlist
 export async function deletePlaylist(playlistId: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: deletePlaylist — no JWT write route yet');
-  void playlistId;
+  const response = await apiClient.delete<{ success?: boolean; error?: string }>(`/playlists/${encodeURIComponent(playlistId)}`)
+  if (response.success === false) throw new Error(response.error || 'Failed to delete playlist')
 }
 
 export async function getPlaylistsContainingVideo(userId: string, videoId: string): Promise<string[]> {

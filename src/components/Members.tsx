@@ -5,8 +5,8 @@ import { useAuth } from '@/stores/authStore';
 import { apiClient } from '@/lib/api-client';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { useZone } from '@/hooks/useZone';
-import { isHQAdminEmail } from '@/config/roles';
 import { isHQGroup } from '@/config/zones';
+import { canPerformAdminAction, getAdminPermissions } from '@/config/admin-permissions';
 import CustomLoader from './CustomLoader';
 import {
   Users,
@@ -1037,7 +1037,7 @@ function MemberManagementDrawer({
   onReject?: (member: Member) => Promise<void>;
   allZones?: any[];
 }) {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, profile: currentProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'credentials' | 'visibility'>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1060,10 +1060,16 @@ function MemberManagementDrawer({
     hideHistory: !!initialHidden.hideHistory,
     hideMinisteredSongs: !!initialHidden.hideMinisteredSongs,
     hideWarmups: !!initialHidden.hideWarmups,
-    hideAnnotations: !!initialHidden.hideAnnotations,
+    hideAnnotations: initialHidden.hideAnnotations !== undefined ? !!initialHidden.hideAnnotations : !isSpecialMemberInitial,
   });
 
   const [editForm, setEditForm] = useState<Partial<Member>>({ ...member });
+  const adminPermissions = getAdminPermissions(
+    currentProfile?.role || currentUser?.role,
+    currentProfile?.hasHqAccess === true || (currentProfile as any)?.has_hq_access === true,
+  );
+  const canEditMemberDetails = canPerformAdminAction(adminPermissions, 'editMemberDetails');
+  const canManageMemberFeatures = canPerformAdminAction(adminPermissions, 'manageMemberFeatures');
 
   useEffect(() => {
     const raw = (member as any).rawData || {};
@@ -1082,13 +1088,15 @@ function MemberManagementDrawer({
       hideHistory: !!h.hideHistory,
       hideMinisteredSongs: !!h.hideMinisteredSongs,
       hideWarmups: !!h.hideWarmups,
-      hideAnnotations: !!h.hideAnnotations,
+      hideAnnotations: h.hideAnnotations !== undefined ? !!h.hideAnnotations : !isSpecialMember,
     });
     setEditForm({ ...member });
     setNewPassword('');
   }, [member]);
 
   const handleSave = async () => {
+    if (!canEditMemberDetails) return;
+
     setLoading(true);
     try {
       const payload: Record<string, any> = {
@@ -1141,6 +1149,8 @@ function MemberManagementDrawer({
   };
 
   const toggleFeature = async (featureKey: string) => {
+    if (!canManageMemberFeatures) return;
+
     const nextHidden = { ...hiddenFeatures, [featureKey]: !hiddenFeatures[featureKey] };
     setHiddenFeatures(nextHidden);
     try {
@@ -1156,7 +1166,7 @@ function MemberManagementDrawer({
     }
   };
 
-  const isHqUser = isHQAdminEmail(currentUser?.email);
+  const isHqUser = canEditMemberDetails;
 
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden">
@@ -1182,7 +1192,8 @@ function MemberManagementDrawer({
             <div className="flex items-center gap-2">
               {!isEditing ? (
                 <button
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => canEditMemberDetails && setIsEditing(true)}
+                  disabled={!canEditMemberDetails}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-indigo-200 active:scale-95 flex items-center gap-1.5"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -1534,9 +1545,12 @@ function MemberManagementDrawer({
                         <button
                           type="button"
                           onClick={() => toggleFeature(f.key)}
+                          disabled={!canManageMemberFeatures}
+                          aria-disabled={!canManageMemberFeatures}
+                          title={canManageMemberFeatures ? `Toggle ${f.title}` : 'Feature visibility is read-only for this role'}
                           className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${
                             !isHidden ? 'bg-indigo-600' : 'bg-slate-300'
-                          }`}
+                          } ${!canManageMemberFeatures ? 'cursor-not-allowed opacity-60' : ''}`}
                         >
                           <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${
                             !isHidden ? 'left-6' : 'left-1'

@@ -6,7 +6,7 @@ import {
   Sparkles, Download, ExternalLink, ShieldAlert, ArrowUpCircle,
   HelpCircle, Globe, Radio, Layers, Check, Copy
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import { ToastContainer, Toast } from '../Toast';
 
 interface AppUpdateConfig {

@@ -67,8 +67,8 @@ export const getMenuItems = (
     }] : []),
     {
       icon: Camera,
-      title: 'Moments & Reels',
-      href: '/pages/moments',
+      title: 'Status',
+      href: '/pages/status',
       badge: null,
     },
     ...(!h.hideAudioLab ? [{

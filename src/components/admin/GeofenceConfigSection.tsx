@@ -6,7 +6,7 @@ import { GoogleMap, useJsApiLoader, Marker, Circle } from '@react-google-maps/ap
 
 import { useZone } from '@/hooks/useZone';
 import { isHQGroup } from '@/config/zones';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 
 const mapContainerStyle = {
   width: '100%',

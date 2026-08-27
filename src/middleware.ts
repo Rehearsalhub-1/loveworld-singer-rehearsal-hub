@@ -51,7 +51,7 @@ export async function middleware(req: NextRequest) {
 
   const isAuthRoute = pathname.startsWith('/auth')
 
-  if (isProtectedRoute && !isLoggedIn) {
+  if (isProtectedRoute && (!isLoggedIn || (pathname.startsWith('/admin') && !tokenCheck.ok))) {
     const url = req.nextUrl.clone()
     url.pathname = '/auth'
     url.searchParams.set('returnUrl', pathname)
@@ -65,8 +65,8 @@ export async function middleware(req: NextRequest) {
   }
 
   if (tokenCheck.ok && tokenCheck.role) {
-    const role = tokenCheck.role
-    const adminRoles = new Set(['admin', 'hq_admin', 'zone_admin'])
+    const role = tokenCheck.role.toLowerCase()
+    const adminRoles = new Set(['admin', 'hq_admin', 'super_admin', 'zone_admin', 'zone_coordinator', 'subgroup_admin', 'subgroup_coordinator'])
 
     if (pathname.startsWith('/admin') && !adminRoles.has(role)) {
       const url = req.nextUrl.clone()
@@ -74,7 +74,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (pathname.startsWith('/boss') && role !== 'hq_admin' && role !== 'admin') {
+    if (pathname.startsWith('/boss') && role !== 'hq_admin' && role !== 'admin' && role !== 'super_admin') {
       const url = req.nextUrl.clone()
       url.pathname = '/home'
       return NextResponse.redirect(url)

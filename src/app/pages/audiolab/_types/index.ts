@@ -1,7 +1,5 @@
 // AudioLab Types - Complete Data Models
 
-import { Timestamp } from 'firebase/firestore';
-
 // VOCAL PARTS & AUDIO
 
 // Standard vocal parts
@@ -55,8 +53,8 @@ export interface AudioLabSong {
   isHQSong: boolean;    // true = distributed from HQ
 
   // Timestamps
-  createdAt: Date | Timestamp;
-  updatedAt: Date | Timestamp;
+  createdAt: Date;
+  updatedAt: Date;
   createdBy: string;    // userId
 }
 
@@ -92,8 +90,8 @@ export interface Playlist {
   userId: string;
   zoneId?: string;
   isPublic: boolean;
-  createdAt: Date | Timestamp;
-  updatedAt: Date | Timestamp;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // PROJECT & TRACK TYPES (Multi-track Studio)

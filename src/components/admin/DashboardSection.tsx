@@ -5,7 +5,7 @@ import { useZone } from '@/hooks/useZone';
 import { useAuth } from '@/stores/authStore';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import {
   Users, Crown, Music, Calendar, TrendingUp,
   Link as LinkIcon, Copy, CheckCircle, CreditCard,

@@ -89,8 +89,14 @@ export class ChatApiService {
   /**
    * Create or update user profile
    */
-  static async createOrUpdateUser(_userData: Partial<ChatUser>): Promise<void> {
-    console.warn('[migration] createOrUpdateUser — chat_users write not on JWT API yet')
+  static async createOrUpdateUser(userData: Partial<ChatUser>): Promise<void> {
+    if (!userData.id) return
+    await apiClient.patch(`/profiles/${encodeURIComponent(userData.id)}`, {
+      ...(userData.firstName !== undefined ? { first_name: userData.firstName } : {}),
+      ...(userData.lastName !== undefined ? { last_name: userData.lastName } : {}),
+      ...(userData.fullName !== undefined ? { fullName: userData.fullName } : {}),
+      ...(userData.profilePic !== undefined ? { profile_image_url: userData.profilePic } : {}),
+    })
   }
 
   /**

@@ -22,7 +22,7 @@ const EVENT_TYPE_CONFIG = {
   reminder: { label: 'Reminder', bg: 'bg-rose-100 text-rose-800 border-rose-200', dot: 'bg-rose-500' },
 };
 
-export default function CalendarSection() {
+export default function CalendarSection({ readOnly = false }: { readOnly?: boolean }) {
   const { currentZone } = useZone();
 
   // Data State
@@ -108,6 +108,7 @@ export default function CalendarSection() {
   }, [events]);
 
   const handleOpenModal = (event?: UpcomingEvent) => {
+    if (readOnly) return;
     if (event) {
       setEditingEvent(event);
       setFormData({
@@ -141,6 +142,7 @@ export default function CalendarSection() {
   };
 
   const handleSaveEvent = async (e: React.FormEvent) => {
+    if (readOnly) return;
     e.preventDefault();
     if (!formData.title.trim() || !formData.date) {
       showToast('error', 'Please provide an event title and start date.');
@@ -171,6 +173,7 @@ export default function CalendarSection() {
   };
 
   const handleToggleCarousel = async (event: UpcomingEvent) => {
+    if (readOnly) return;
     try {
       const zoneId = currentZone?.id || 'zone-001';
       await UpcomingEventsService.updateEvent(event.id, {
@@ -184,6 +187,7 @@ export default function CalendarSection() {
   };
 
   const handleDeleteEvent = async () => {
+    if (readOnly) return;
     if (!eventToDelete) return;
     try {
       const zoneId = currentZone?.id || 'zone-001';
@@ -256,13 +260,15 @@ export default function CalendarSection() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-purple-600' : ''}`} />
             </button>
 
-            <button
-              onClick={() => handleOpenModal()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Calendar Event</span>
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => handleOpenModal()}
+                className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Calendar Event</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -353,7 +359,7 @@ export default function CalendarSection() {
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
                 {searchTerm ? 'Try searching with another keyword.' : 'Schedule upcoming choir rehearsals, sound checks, or praise night dates.'}
               </p>
-              {!searchTerm && (
+              {!searchTerm && !readOnly && (
                 <button
                   onClick={() => handleOpenModal()}
                   className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
@@ -394,7 +400,7 @@ export default function CalendarSection() {
                           {typeConfig.label}
                         </span>
 
-                        <button
+                        {!readOnly && <button
                           type="button"
                           onClick={() => handleToggleCarousel(event)}
                           className={`p-1.5 rounded-lg shadow-xs pointer-events-auto backdrop-blur-md transition-all ${
@@ -405,7 +411,7 @@ export default function CalendarSection() {
                           title={event.showInCarousel ? 'Pinned to banner carousel' : 'Hidden from carousel'}
                         >
                           {event.showInCarousel ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                        </button>
+                        </button>}
                       </div>
                     </div>
 
@@ -447,15 +453,15 @@ export default function CalendarSection() {
                         </span>
 
                         <div className="flex items-center gap-1">
-                          <button
+                          {!readOnly && <button
                             type="button"
                             onClick={() => handleOpenModal(event)}
                             className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
                             title="Edit event"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
+                          </button>}
+                          {!readOnly && <button
                             type="button"
                             onClick={() => {
                               setEventToDelete(event);
@@ -465,7 +471,7 @@ export default function CalendarSection() {
                             title="Delete event"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     </div>
@@ -528,7 +534,7 @@ export default function CalendarSection() {
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      <button
+                      {!readOnly && <button
                         type="button"
                         onClick={() => handleToggleCarousel(event)}
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -539,18 +545,18 @@ export default function CalendarSection() {
                       >
                         {event.showInCarousel ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                         <span>{event.showInCarousel ? 'Banner Pinned' : 'Hidden'}</span>
-                      </button>
+                      </button>}
 
-                      <button
+                      {!readOnly && <button
                         type="button"
                         onClick={() => handleOpenModal(event)}
                         className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
                         title="Edit event"
                       >
                         <Edit2 className="w-4 h-4" />
-                      </button>
+                      </button>}
 
-                      <button
+                      {!readOnly && <button
                         type="button"
                         onClick={() => {
                           setEventToDelete(event);
@@ -560,7 +566,7 @@ export default function CalendarSection() {
                         title="Delete event"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 );

@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 
 export type MediaType = 'video' | 'audio' | 'image';
 export type ViewMode = 'grid' | 'table';
@@ -172,8 +172,7 @@ export default function MediaUploadSection() {
     else if (!globalMediaCache || globalMediaCache.items.length === 0) setLoading(true);
 
     try {
-      const zoneParam = effectiveZoneId ? `&zoneId=${encodeURIComponent(effectiveZoneId)}` : '';
-      const res = await apiClient.get<any>(`/media?limit=10000${zoneParam}`);
+      const res = await apiClient.media.list({ zoneId: effectiveZoneId, limit: 10000 });
       let items: MediaItem[] = [];
       if (Array.isArray(res)) items = res;
       else if (res && typeof res === 'object') {
@@ -309,12 +308,12 @@ export default function MediaUploadSection() {
     try {
       if (editingItem) {
         // Update
-        const res = await apiClient.patch<any>(`/media/${editingItem.id}`, payload);
+        const res = await apiClient.media.update(editingItem.id, payload);
         const updated = (res && res.data) ? res.data : { ...editingItem, ...payload, updatedAt: new Date().toISOString() };
         setMediaItems(prev => prev.map(m => m.id === editingItem.id ? updated : m));
       } else {
         // Create
-        const res = await apiClient.post<any>('/media', payload);
+        const res = await apiClient.media.create(payload);
         const created = (res && res.data) ? res.data : {
           id: res?.id || `media_${Date.now()}`,
           ...payload,
@@ -337,7 +336,7 @@ export default function MediaUploadSection() {
     setDeletingId(item.id);
 
     try {
-      await apiClient.delete(`/media/${item.id}`);
+      await apiClient.media.remove(item.id);
       setMediaItems(prev => prev.filter(m => m.id !== item.id));
       if (previewItem?.id === item.id) setPreviewItem(null);
       if (playingAudioId === item.id) {
@@ -365,7 +364,7 @@ export default function MediaUploadSection() {
     const ids = Array.from(selectedIds);
     setLoading(true);
     try {
-      await Promise.all(ids.map(id => apiClient.delete(`/media/${id}`).catch(() => null)));
+      await Promise.all(ids.map(id => apiClient.media.remove(id).catch(() => null)));
       setMediaItems(prev => prev.filter(m => !selectedIds.has(m.id)));
       setSelectedIds(new Set());
     } finally {

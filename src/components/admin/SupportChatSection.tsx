@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import {
   MessageCircle,
   Send,

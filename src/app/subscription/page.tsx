@@ -12,7 +12,8 @@ import { apiClient } from '@/lib/api-client';
 const SubscriptionService = {
   getUserSubscription: async (userId: string) => apiClient.get(`/subscriptions/${encodeURIComponent(userId)}`),
   initializePayment: async (data: any) => apiClient.post('/kingspay/initialize', data),
-  cancel: async (userId: string) => apiClient.post(`/subscriptions/${encodeURIComponent(userId)}/revoke`, {})
+  cancel: async (userId: string): Promise<{ success: boolean; error?: string }> =>
+    apiClient.post<{ success: boolean; error?: string }>(`/subscriptions/${encodeURIComponent(userId)}/revoke`, {})
 };
 
 import { useEffect } from 'react'

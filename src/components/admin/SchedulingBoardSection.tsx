@@ -7,9 +7,9 @@ import {
   Search, AlertCircle, Layers, Users, X, MoreVertical
 } from 'lucide-react';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 
-const useSchedulingBoard = () => {
+const useSchedulingBoard = (readOnly = false) => {
   const { 
     selectedZoneId, 
     isGlobalView, 
@@ -131,7 +131,7 @@ const useSchedulingBoard = () => {
 
   return {
     loading,
-    canEdit: true,
+    canEdit: !readOnly,
     viewHistory,
     setViewHistory,
     programs,
@@ -159,12 +159,12 @@ const TABS = [
   { id: 'eligibility', label: 'Eligibility' },
 ];
 
-export default function SchedulingBoardSection() {
+export default function SchedulingBoardSection({ readOnly = false }: { readOnly?: boolean }) {
   const {
     loading, canEdit, viewHistory, setViewHistory,
     programs, activeProgramId, setActiveProgramId, activeProgram,
     createProgram, updateProgramData, toggleArchive, deleteActiveProgram, renameActiveProgram, setCurrentProgram, selectedZone
-  } = useSchedulingBoard();
+  } = useSchedulingBoard(readOnly);
 
   const [activeTab, setActiveTab] = useState('schedule');
   const [showCreateProg, setShowCreateProg] = useState(false);

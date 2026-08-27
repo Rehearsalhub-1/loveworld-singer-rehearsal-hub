@@ -1,4 +1,112 @@
-// Media library service
+import { apiClient, getActiveScope } from '@/lib/api-client'
+
+function toNumber(value: unknown, fallback = 0): number {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : fallback
+}
+
+function toDate(value: unknown, fallback = new Date()): Date {
+  if (value instanceof Date) return value
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) return parsed
+  }
+  return fallback
+}
+
+function normalizeType(raw: any): MediaItem['type'] {
+  const candidate = String(raw?.type || raw?.mediaType || raw?.category || 'video').toLowerCase()
+  if (candidate.includes('audio')) return 'audio'
+  if (candidate.includes('image')) return 'image'
+  if (candidate.includes('document')) return 'document'
+  return 'video'
+}
+
+function normalizeMediaRow(raw: any): MediaItem | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  const id = String(raw.id || raw.mediaId || raw._id || '')
+  if (!id) return null
+
+  const title = String(raw.title || raw.name || 'Untitled media')
+  const url = String(raw.url || raw.videoUrl || raw.video_url || raw.youtubeUrl || raw.youtube_url || raw.thumbnail || '')
+  const thumbnail = String(
+    raw.thumbnail ?? raw.thumbnailUrl ?? raw.image ?? raw.coverImage ?? raw.poster ?? raw.imageUrl ?? ''
+  )
+
+  return {
+    id,
+    title,
+    description: typeof raw.description === 'string' ? raw.description : '',
+    thumbnail,
+    videoUrl: url,
+    youtubeUrl: typeof raw.youtubeUrl === 'string' ? raw.youtubeUrl : undefined,
+    backdropImage: typeof raw.backdropImage === 'string' ? raw.backdropImage : undefined,
+    genre: Array.isArray(raw.genre)
+      ? raw.genre.map(String)
+      : Array.isArray(raw.genres)
+        ? raw.genres.map(String)
+        : [],
+    type: normalizeType(raw),
+    duration: typeof raw.duration === 'number' ? raw.duration : undefined,
+    releaseYear: typeof raw.releaseYear === 'number' ? raw.releaseYear : undefined,
+    rating: typeof raw.rating === 'number' ? raw.rating : undefined,
+    views: toNumber(raw.views ?? raw.viewCount ?? raw.viewsCount, 0),
+    likes: toNumber(raw.likes ?? raw.likeCount ?? raw.likesCount, 0),
+    featured: Boolean(raw.featured ?? raw.isFeatured ?? false),
+    hidden: Boolean(raw.hidden ?? false),
+    isYouTube: Boolean(raw.isYoutube ?? raw.is_youtube ?? (raw.youtubeUrl || raw.youtube_url)),
+    forHQ: Boolean(raw.forHq ?? raw.for_hq ?? (raw.isHqOnly ?? false)),
+    createdByName: typeof raw.createdByName === 'string' ? raw.createdByName : undefined,
+    createdAt: toDate(raw.createdAt ?? raw.created_at ?? new Date()),
+    updatedAt: toDate(raw.updatedAt ?? raw.updated_at ?? new Date()),
+  }
+}
+
+function unwrapResults(payload: unknown): any[] {
+  if (Array.isArray(payload)) return payload
+  if (!payload || typeof payload !== 'object') return []
+
+  const record = payload as Record<string, unknown>
+  if (Array.isArray(record.data)) return record.data
+  if (Array.isArray(record.items)) return record.items
+  if (Array.isArray(record.results)) return record.results
+  if (record.data && typeof record.data === 'object') {
+    const nested = record.data as Record<string, unknown>
+    if (Array.isArray(nested.items)) return nested.items
+    if (Array.isArray(nested.data)) return nested.data
+  }
+  return []
+}
+
+function getLocalHistoryKey(userId: string): string {
+  return `lwsrh-media-history:${userId}`
+}
+
+function getLocalFavoritesKey(userId: string): string {
+  return `lwsrh-media-favorites:${userId}`
+}
+
+function readJson<T>(key: string): T[] {
+  if (typeof window === 'undefined') return [] as T[]
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return [] as T[]
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return [] as T[]
+  }
+}
+
+function writeJson<T>(key: string, value: T[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Ignore quota or unavailable local storage issues.
+  }
+}
 
 // Types
 export interface AdminPlaylist {
@@ -106,109 +214,151 @@ class MediaLibraryService {
   private favoritesCollection = 'user_favorites'
 
   async createMedia(mediaData: Omit<MediaItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    console.warn('[migration] media-library-service.ts: createMedia — no JWT write route yet');
-    void mediaData;
-    return '';
+    const res = await apiClient.post<{ success?: boolean; data?: any }>('/media', mediaData)
+    if (res?.success && res.data) {
+      return String((res.data as any).id || '')
+    }
+    return ''
   }
 
   async getAllMedia(limitCount: number = 24): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getAllMedia — no JWT API route yet');
-    void limitCount;
-    return [];
+    const params = new URLSearchParams({ limit: String(limitCount) })
+    const scope = getActiveScope()
+    if (scope.zoneId) params.set('zoneId', scope.zoneId)
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?${params.toString()}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async getMediaForZone(isHQZone: boolean, limitCount: number = 24): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getMediaForZone — no JWT API route yet');
-    void isHQZone;
-    void limitCount;
-    return [];
+    const params = new URLSearchParams({ limit: String(limitCount) })
+    const scope = getActiveScope()
+    if (scope.zoneId) params.set('zoneId', scope.zoneId)
+    if (isHQZone) params.set('isHqOnly', 'true')
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?${params.toString()}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async loadMoreMedia(lastCreatedAt: Date, limitCount: number = 12): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: loadMoreMedia — no JWT API route yet');
-    void lastCreatedAt;
-    void limitCount;
-    return [];
+    const params = new URLSearchParams({ limit: String(limitCount) })
+    const scope = getActiveScope()
+    if (scope.zoneId) params.set('zoneId', scope.zoneId)
+    if (lastCreatedAt) params.set('after', toDate(lastCreatedAt).toISOString())
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?${params.toString()}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async getMediaByType(type: MediaItem['type']): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getMediaByType — no JWT API route yet');
-    void type;
-    return [];
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?type=${encodeURIComponent(type)}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async getMediaByGenre(genre: string): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getMediaByGenre — no JWT API route yet');
-    void genre;
-    return [];
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?search=${encodeURIComponent(genre)}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async getFeaturedMedia(): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getFeaturedMedia — no JWT API route yet');
-    return [];
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>('/media?featured=true&limit=12')
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async getMediaById(mediaId: string): Promise<MediaItem | null> {
-    console.warn('[migration] media-library-service.ts: getMediaById — no JWT API route yet');
-    void mediaId;
-    return null;
+    if (!mediaId) return null
+    const res = await apiClient.get<{ success?: boolean; data?: any }>(`/media/${encodeURIComponent(mediaId)}`)
+    const item = res?.data ?? null
+    return item ? normalizeMediaRow(item) : null
   }
 
   async getMediaByIds(mediaIds: string[]): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getMediaByIds — no JWT API route yet');
-    void mediaIds;
-    return [];
+    if (!mediaIds.length) return []
+    const results = await Promise.all(mediaIds.map((id) => this.getMediaById(id)))
+    return results.filter((item): item is MediaItem => Boolean(item))
   }
 
   async getRelatedMedia(mediaId: string, limitCount: number = 10): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: getRelatedMedia — no JWT API route yet');
-    void mediaId;
-    void limitCount;
-    return [];
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?limit=${limitCount}&search=${encodeURIComponent(mediaId)}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => item !== null && item.id !== mediaId)
   }
 
   async searchMedia(searchTerm: string): Promise<MediaItem[]> {
-    console.warn('[migration] media-library-service.ts: searchMedia — no JWT API route yet');
-    void searchTerm;
-    return [];
+    if (!searchTerm.trim()) return []
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?search=${encodeURIComponent(searchTerm)}`)
+    return unwrapResults(res)
+      .map((item) => normalizeMediaRow(item))
+      .filter((item): item is MediaItem => Boolean(item))
   }
 
   async incrementViews(mediaId: string): Promise<void> {
-    console.warn('[migration] media-library-service.ts: incrementViews — no JWT write route yet');
-    void mediaId;
+    await apiClient.post(`/media/${encodeURIComponent(mediaId)}/views`, {}).catch(() => undefined)
   }
 
   async incrementLikes(mediaId: string): Promise<void> {
-    console.warn('[migration] media-library-service.ts: incrementLikes — no JWT write route yet');
-    void mediaId;
+    await apiClient.post(`/media/${encodeURIComponent(mediaId)}/likes`, {}).catch(() => undefined)
   }
 
   async getAllGenres(): Promise<Genre[]> {
-    console.warn('[migration] media-library-service.ts: getAllGenres — no JWT API route yet');
-    return [];
+    const res = await apiClient.get<{ success?: boolean; data?: any[] }>('/media/categories')
+    return unwrapResults(res)
+      .map((row) => ({
+        id: String(row.id || row.slug || row.name || ''),
+        name: String(row.name || row.title || 'Category'),
+        slug: String(row.slug || String(row.name || '').toLowerCase().replace(/\s+/g, '-')),
+      }))
+      .filter((row) => row.id)
   }
 
   async saveWatchProgress(userId: string, mediaId: string, progress: number): Promise<void> {
-    console.warn('[migration] media-library-service.ts: saveWatchProgress — no JWT write route yet');
-    void userId;
-    void mediaId;
-    void progress;
+    if (!userId || !mediaId) return
+
+    const key = getLocalHistoryKey(userId)
+    const entries = readJson<UserWatchHistory>(key)
+    const timestamp = new Date().toISOString()
+    const next = { id: `${mediaId}_${Date.now()}`, userId, mediaId, progress, lastWatched: new Date(timestamp) }
+
+    const filtered = entries.filter((entry) => entry.mediaId !== mediaId)
+    filtered.unshift(next)
+    writeJson(key, filtered.slice(0, 50))
   }
 
   async getUserWatchHistory(userId: string): Promise<UserWatchHistory[]> {
-    console.warn('[migration] media-library-service.ts: getUserWatchHistory — no JWT API route yet');
-    void userId;
-    return [];
+    if (!userId) return []
+    const entries = readJson<UserWatchHistory>(getLocalHistoryKey(userId))
+    return entries
+      .map((entry) => ({
+        ...entry,
+        lastWatched: typeof entry.lastWatched === 'string' ? new Date(entry.lastWatched) : new Date(),
+      }))
+      .sort((a, b) => new Date(b.lastWatched).getTime() - new Date(a.lastWatched).getTime())
   }
 
   async removeFromWatchHistory(historyId: string): Promise<void> {
-    console.warn('[migration] media-library-service.ts: removeFromWatchHistory — no JWT write route yet');
-    void historyId;
+    if (!historyId) return
+    const keys = Object.keys(localStorage || {})
+    for (const key of keys) {
+      if (!key.startsWith('lwsrh-media-history:')) continue
+      const entries = readJson<UserWatchHistory>(key)
+      const next = entries.filter((entry) => entry.id !== historyId)
+      writeJson(key, next)
+    }
   }
 
   async clearUserWatchHistory(userId: string): Promise<void> {
-    console.warn('[migration] media-library-service.ts: clearUserWatchHistory — no JWT API route yet');
-    void userId;
+    if (!userId) return
+    writeJson(getLocalHistoryKey(userId), [])
   }
 
   async getContinueWatching(userId: string): Promise<MediaItem[]> {
@@ -229,24 +379,35 @@ class MediaLibraryService {
   }
 
   async addToFavorites(userId?: string, mediaId?: string): Promise<void> {
-    void userId;
-    void mediaId;
+    if (!userId || !mediaId) return
+    const key = getLocalFavoritesKey(userId)
+    const current = readJson<{ id: string; mediaId: string; createdAt: string }>(key)
+    const next = current.filter((entry) => entry.mediaId !== mediaId)
+    next.unshift({ id: `${userId}_${mediaId}`, mediaId, createdAt: new Date().toISOString() })
+    writeJson(key, next)
   }
 
   async removeFromFavorites(userId?: string, mediaId?: string): Promise<void> {
-    void userId;
-    void mediaId;
+    if (!userId || !mediaId) return
+    const key = getLocalFavoritesKey(userId)
+    const current = readJson<{ id: string; mediaId: string; createdAt: string }>(key)
+    writeJson(key, current.filter((entry) => entry.mediaId !== mediaId))
   }
 
   async getUserFavorites(userId?: string): Promise<MediaItem[]> {
-    void userId;
-    return [];
+    if (!userId) return []
+    const key = getLocalFavoritesKey(userId)
+    const ids = readJson<{ mediaId: string }>(key).map((entry) => entry.mediaId)
+    if (!ids.length) return []
+    const items = await this.getMediaByIds(Array.from(new Set(ids)))
+    return items
   }
 
   async isFavorite(userId?: string, mediaId?: string): Promise<boolean> {
-    void userId;
-    void mediaId;
-    return false;
+    if (!userId || !mediaId) return false
+    const key = getLocalFavoritesKey(userId)
+    const current = readJson<{ mediaId: string }>(key)
+    return current.some((entry) => entry.mediaId === mediaId)
   }
 
   subscribeToMedia(callback: (media: MediaItem[]) => void): () => void {

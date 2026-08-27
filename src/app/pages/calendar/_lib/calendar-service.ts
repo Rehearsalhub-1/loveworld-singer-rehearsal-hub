@@ -1,4 +1,4 @@
-import { BackendAPI } from '@/lib/api-client'
+import { UpcomingEventsService, UpcomingEvent } from './upcoming-events-service'
 
 export interface CalendarEvent {
   id: string
@@ -54,39 +54,23 @@ function toDate(val: unknown): Date {
   return new Date()
 }
 
-const db: any = {};
-const collection = (_db: any, _col: string) => ({});
-const query = (..._args: any[]) => ({});
-const orderBy = (..._args: any[]) => ({});
-const limit = (..._args: any[]) => ({});
-const onSnapshot = (_q: any, _cb: any, _errCb?: any) => () => {};
-
 export class CalendarService {
-  private eventsCollection = collection(db, 'calendar_events')
-
   async createEvent(eventData: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    console.warn('[migration] calendar-service.ts: createEvent — no JWT write route yet');
-    void eventData;
-    return '';
+    const created = await UpcomingEventsService.createEvent(this.toUpcomingEvent(eventData));
+    return created.id;
   }
 
   async updateEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<void> {
-    console.warn('[migration] calendar-service.ts: updateEvent — no JWT write route yet');
-    void eventId;
-    void updates;
+    await UpcomingEventsService.updateEvent(eventId, this.toUpcomingUpdates(updates), updates.zoneId);
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    console.warn('[migration] calendar-service.ts: deleteEvent — no JWT write route yet');
-    void eventId;
+    await UpcomingEventsService.deleteEvent(eventId);
   }
 
   private async listScheduleEvents(): Promise<CalendarEvent[]> {
-    const response = await BackendAPI.generic.list('schedule', 5000)
-    const rows = Array.isArray(response.data) ? response.data : []
-    return rows
-      .filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
-      .map((row) => this.convertApiEvent(String(row.id ?? ''), row))
+    const rows = await UpcomingEventsService.getAllEvents(undefined, true)
+    return rows.map((row) => this.convertApiEvent(row.id, row as unknown as Record<string, unknown>))
   }
 
   async getZoneEvents(zoneId: string, userId?: string, userRole?: string): Promise<CalendarEvent[]> {
@@ -133,31 +117,56 @@ export class CalendarService {
   }
 
   subscribeToZoneEvents(zoneId: string, callback: (events: CalendarEvent[]) => void, userId?: string, userRole?: string): () => void {
-    const q = query(
-      this.eventsCollection,
-      orderBy('start', 'asc'),
-      limit(200)
-    )
+    let cancelled = false
+    const load = async () => {
+      try {
+        const events = await this.getZoneEvents(zoneId, userId, userRole)
+        if (!cancelled) callback(events)
+      } catch (error) {
+        console.error('Error in events subscription:', error)
+      }
+    }
 
-    return onSnapshot(q, (snapshot: any) => {
-      const allEvents = snapshot.docs.map((d: any) => this.convertFirestoreEvent(d.id, d.data()))
-
-      const filtered = allEvents.filter((event: any) => {
-        if (userRole === 'boss') return true
-        return event.zoneId === zoneId ||
-          event.isGlobal === true ||
-          (userId && event.createdBy === userId)
-      })
-      callback(filtered)
-    }, (error: any) => {
-      console.error('Error in events subscription:', error)
-    })
+    void load()
+    const refreshTimer = window.setInterval(load, 60_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(refreshTimer)
+    }
   }
 
   async addAttendee(eventId: string, attendee: Omit<EventAttendee, 'respondedAt'>): Promise<void> {
     console.warn('[migration] calendar-service.ts: addAttendee — no JWT write route yet');
     void eventId;
     void attendee;
+  }
+
+  private toUpcomingEvent(event: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>): Omit<UpcomingEvent, 'id' | 'createdAt' | 'updatedAt'> {
+    return {
+      title: event.title,
+      description: event.description,
+      date: event.start.toISOString(),
+      endDate: event.end.toISOString(),
+      location: event.location,
+      type: event.type === 'performance' ? 'event' : event.type,
+      showInCarousel: true,
+      isGlobal: event.isGlobal,
+      zoneId: event.zoneId,
+      createdBy: event.createdBy,
+    }
+  }
+
+  private toUpcomingUpdates(updates: Partial<CalendarEvent>): Partial<UpcomingEvent> {
+    return {
+      ...(updates.title !== undefined ? { title: updates.title } : {}),
+      ...(updates.description !== undefined ? { description: updates.description } : {}),
+      ...(updates.start !== undefined ? { date: updates.start.toISOString() } : {}),
+      ...(updates.end !== undefined ? { endDate: updates.end.toISOString() } : {}),
+      ...(updates.location !== undefined ? { location: updates.location } : {}),
+      ...(updates.type !== undefined ? { type: updates.type === 'performance' ? 'event' : updates.type } : {}),
+      ...(updates.isGlobal !== undefined ? { isGlobal: updates.isGlobal } : {}),
+      ...(updates.zoneId !== undefined ? { zoneId: updates.zoneId } : {}),
+    }
   }
 
   async updateAttendeeStatus(eventId: string, userId: string, status: EventAttendee['status']): Promise<void> {

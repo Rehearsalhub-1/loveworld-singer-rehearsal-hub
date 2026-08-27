@@ -8,7 +8,7 @@ import {
   ChevronRight, Sparkles, X, Filter, BarChart3, Activity, Trash2
 } from 'lucide-react';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import CustomLoader from '@/components/CustomLoader';
 import { isHQGroup } from '@/config/zones';
 

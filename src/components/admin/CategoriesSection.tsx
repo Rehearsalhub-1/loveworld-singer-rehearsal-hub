@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Category, PraiseNightSong } from '../../types/supabase';
 import { Toast } from '../Toast';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 
 interface CategoriesSectionProps {

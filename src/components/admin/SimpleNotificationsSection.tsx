@@ -7,7 +7,7 @@ import {
   Clock, ShieldAlert, Radio, User, ExternalLink, Check, Copy,
   Edit3, Pencil, CheckSquare, Layers
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import { useAuth } from '@/hooks/useAuth';
 import { useZone } from '@/hooks/useZone';
 import CustomLoader from '@/components/CustomLoader';
@@ -35,7 +35,7 @@ interface NotificationsCache {
 let globalNotificationsCache: NotificationsCache | null = null;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
-export default function SimpleNotificationsSection() {
+export default function SimpleNotificationsSection({ readOnly = false }: { readOnly?: boolean }) {
   const { user } = useAuth();
   const { currentZone } = useZone();
   
@@ -114,6 +114,7 @@ export default function SimpleNotificationsSection() {
   }, [loadMessages]);
 
   const handleOpenCompose = () => {
+    if (readOnly) return;
     setEditingMessage(null);
     setTitle('');
     setMessage('');
@@ -124,6 +125,7 @@ export default function SimpleNotificationsSection() {
   };
 
   const handleOpenEdit = (msg: AdminMessage) => {
+    if (readOnly) return;
     setEditingMessage(msg);
     setTitle(msg.title || msg.rawData?.title || '');
     const text = msg.message || msg.body || (msg as any).text || (msg as any).content || msg.rawData?.message || msg.rawData?.body || msg.rawData?.text || msg.rawData?.content || '';
@@ -138,6 +140,7 @@ export default function SimpleNotificationsSection() {
 
   // CREATE & UPDATE handler
   const handleSaveBroadcast = async () => {
+    if (readOnly) return;
     if (!title.trim() || !message.trim()) {
       showToast('error', 'Please provide both a broadcast title and message.');
       return;
@@ -192,6 +195,7 @@ export default function SimpleNotificationsSection() {
 
   // DELETE handler
   const handleDeleteMessage = async (messageId: string) => {
+    if (readOnly) return;
     try {
       setDeletingId(messageId);
       await apiClient.delete('/notifications/' + messageId);
@@ -287,13 +291,15 @@ export default function SimpleNotificationsSection() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-purple-600' : ''}`} />
             </button>
 
-            <button
-              onClick={handleOpenCompose}
-              className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
-            >
-              <Send className="w-4 h-4" />
-              <span>Compose Broadcast</span>
-            </button>
+            {!readOnly && (
+              <button
+                onClick={handleOpenCompose}
+                className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
+              >
+                <Send className="w-4 h-4" />
+                <span>Compose Broadcast</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -374,7 +380,7 @@ export default function SimpleNotificationsSection() {
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
                 {searchTerm ? 'No announcement matched your search criteria.' : 'Create your first system broadcast announcement to notify singers.'}
               </p>
-              {!searchTerm && (
+              {!searchTerm && !readOnly && (
                 <button
                   type="button"
                   onClick={handleOpenCompose}
@@ -442,14 +448,16 @@ export default function SimpleNotificationsSection() {
 
                     {/* Action Buttons (EDIT, COPY, DELETE) */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(msg)}
-                        className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
-                        title="Edit broadcast"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(msg)}
+                          className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
+                          title="Edit broadcast"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -460,15 +468,17 @@ export default function SimpleNotificationsSection() {
                         {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMessage(msg.id)}
-                        disabled={isDeleting}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
-                        title="Delete broadcast"
-                      >
-                        {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          disabled={isDeleting}
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                          title="Delete broadcast"
+                        >
+                          {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

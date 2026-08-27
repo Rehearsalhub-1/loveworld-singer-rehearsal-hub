@@ -11,6 +11,7 @@ import type {
   AudioUrls,
   LyricLine
 } from '../_types';
+import { apiClient } from '@/lib/api-client';
 
 type QueryDocumentSnapshot<T = any> = any;
 type DocumentData = any;
@@ -36,6 +37,40 @@ export interface MasterProgram {
   sortOrder?: number;
 }
 
+type ApiEnvelope<T> = { success?: boolean; data?: T; error?: string };
+
+function toAudioLabSong(data: Record<string, any>): AudioLabSong {
+  const audioUrls: AudioUrls = data.audioUrls || data.audio_urls || {};
+  const audioFile = data.audioFile || data.audio_file;
+  if (!audioUrls.full && audioFile) audioUrls.full = audioFile;
+
+  return {
+    id: String(data.id),
+    title: String(data.title || ''),
+    artist: String(data.artist || data.writer || data.leadSinger || ''),
+    duration: Number(data.duration || 0),
+    audioUrls,
+    availableParts: determineAvailableParts(audioUrls),
+    genre: data.genre || data.category || '',
+    key: data.key || '',
+    tempo: typeof data.tempo === 'string' ? parseInt(data.tempo, 10) || 0 : Number(data.tempo || 0),
+    albumArt: data.albumArt || data.imageUrl || data.image_url || '',
+    lyricsUrl: data.lyricsUrl || '',
+    lyrics: parseLyrics(data.lyrics),
+    zoneId: data.zoneId || undefined,
+    isHQSong: data.isHQSong ?? data.isHqOnly ?? true,
+    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+    createdBy: String(data.createdBy || data.publishedBy || ''),
+  };
+}
+
+async function fetchMasterSongs(): Promise<AudioLabSong[]> {
+  const response = await apiClient.get<ApiEnvelope<Record<string, any>[]>>('/songs/master');
+  if (response?.success === false) throw new Error(response.error || 'Failed to load songs');
+  return (Array.isArray(response?.data) ? response.data : []).map(toAudioLabSong);
+}
+
 // FETCH OPERATIONS
 
 /**
@@ -50,9 +85,8 @@ export async function getPrograms(): Promise<MasterProgram[]> {
  * Get songs for a specific program
  */
 export async function getSongsByProgram(programId: string): Promise<AudioLabSong[]> {
-  console.warn('[migration] song-service.ts: getSongsByProgram — no JWT API route yet');
-  void programId;
-  return [];
+  const songs = await fetchMasterSongs();
+  return songs.filter((song) => (song as any).programId === programId);
 }
 
 /**
@@ -62,10 +96,14 @@ export async function getSongsPaginated(
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
   limitCount: number = 20
 ): Promise<{ songs: AudioLabSong[], lastDoc: QueryDocumentSnapshot<DocumentData> | null }> {
-  console.warn('[migration] song-service.ts: getSongsPaginated — no JWT API route yet');
-  void lastDoc;
-  void limitCount;
-  return { songs: [], lastDoc: null };
+  const allSongs = await fetchMasterSongs();
+  const offset = lastDoc && typeof lastDoc.offset === 'number' ? lastDoc.offset : 0;
+  const songs = allSongs.slice(offset, offset + limitCount);
+  const nextOffset = offset + songs.length;
+  return {
+    songs,
+    lastDoc: nextOffset < allSongs.length ? { offset: nextOffset } : null,
+  };
 }
 
 /**
@@ -96,15 +134,12 @@ export async function searchSongsDeep(searchTerm: string, zoneId?: string): Prom
  * Get total number of songs in Master Library
  */
 export async function getTotalSongCount(): Promise<number> {
-  console.warn('[migration] song-service.ts: getTotalSongCount — no JWT API route yet');
-  return 0;
+  return (await fetchMasterSongs()).length;
 }
 
 export async function getSongs(zoneId?: string, limitCount: number = 500): Promise<AudioLabSong[]> {
-  console.warn('[migration] song-service.ts: getSongs — no JWT API route yet');
-  void zoneId;
-  void limitCount;
-  return [];
+  const songs = await fetchMasterSongs();
+  return songs.filter((song) => !zoneId || !song.zoneId || song.zoneId === zoneId).slice(0, limitCount);
 }
 
 /**
@@ -112,18 +147,15 @@ export async function getSongs(zoneId?: string, limitCount: number = 500): Promi
  * Used for browsing/viewing lyrics
  */
 export async function getAllMasterSongs(limitCount: number = 200): Promise<AudioLabSong[]> {
-  console.warn('[migration] song-service.ts: getAllMasterSongs — no JWT API route yet');
-  void limitCount;
-  return [];
+  return (await fetchMasterSongs()).slice(0, limitCount);
 }
 
 /**
  * Get a single song by ID (checks Master Library first)
  */
 export async function getSongById(songId: string): Promise<AudioLabSong | null> {
-  console.warn('[migration] song-service.ts: getSongById — no JWT API route yet');
-  void songId;
-  return null;
+  const response = await apiClient.get<ApiEnvelope<Record<string, any>>>(`/songs/master/${encodeURIComponent(songId)}`);
+  return response?.data ? toAudioLabSong(response.data) : null;
 }
 
 /**
@@ -175,9 +207,13 @@ export async function getSongsByVocalPart(part: VocalPart, zoneId?: string): Pro
  * Create a new song
  */
 export async function createSong(input: CreateSongInput): Promise<{ success: boolean; id?: string; error?: string }> {
-  console.warn('[migration] song-service.ts: createSong — no JWT API route yet');
-  void input;
-  return { success: false, error: 'Song create unavailable during migration' };
+  const response = await apiClient.post<ApiEnvelope<{ id?: string }>>('/master', {
+    ...input,
+    writer: input.artist,
+    category: input.genre,
+    audioFile: input.audioUrls.full,
+  });
+  return { success: response?.success !== false, id: response?.data?.id, error: response?.error };
 }
 
 /**
@@ -187,19 +223,16 @@ export async function updateSong(
   songId: string,
   updates: Partial<Omit<AudioLabSong, 'id' | 'createdAt' | 'createdBy'>>
 ): Promise<{ success: boolean; error?: string }> {
-  console.warn('[migration] song-service.ts: updateSong — no JWT API route yet');
-  void songId;
-  void updates;
-  return { success: false, error: 'Song update unavailable during migration' };
+  const response = await apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`, updates);
+  return { success: response?.success !== false, error: response?.error };
 }
 
 /**
  * Delete a song
  */
 export async function deleteSong(songId: string): Promise<{ success: boolean; error?: string }> {
-  console.warn('[migration] song-service.ts: deleteSong — no JWT API route yet');
-  void songId;
-  return { success: false, error: 'Song delete unavailable during migration' };
+  const response = await apiClient.delete<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`);
+  return { success: response?.success !== false, error: response?.error };
 }
 
 // AUDIO PART MANAGEMENT
@@ -212,11 +245,12 @@ export async function updateSongAudioPart(
   part: VocalPart,
   url: string
 ): Promise<{ success: boolean; error?: string }> {
-  console.warn('[migration] song-service.ts: updateSongAudioPart — no JWT API route yet');
-  void songId;
-  void part;
-  void url;
-  return { success: false, error: 'Song audio part update unavailable during migration' };
+  const song = await getSongById(songId);
+  if (!song) return { success: false, error: 'Song not found' };
+  const response = await apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`, {
+    audioUrls: { ...song.audioUrls, [part]: url },
+  });
+  return { success: response?.success !== false, error: response?.error };
 }
 
 /**
@@ -228,10 +262,12 @@ export async function removeSongAudioPart(
 ): Promise<{ success: boolean; error?: string }> {
   try {
 
-    console.warn('[migration] song-service.ts: removeSongAudioPart — no JWT API route yet');
-    void songId;
-    void part;
-    return { success: false, error: 'Song audio part removal unavailable during migration' };
+    const song = await getSongById(songId);
+    if (!song) return { success: false, error: 'Song not found' };
+    const audioUrls = { ...song.audioUrls };
+    delete audioUrls[part];
+    const response = await apiClient.patch<ApiEnvelope>(`/master/${encodeURIComponent(songId)}`, { audioUrls });
+    return { success: response?.success !== false, error: response?.error };
   } catch (error) {
  console.error('[SongService] Error removing audio part:', error);
     return {
@@ -250,10 +286,8 @@ export async function updateSongLyrics(
   songId: string,
   lyrics: LyricLine[]
 ): Promise<{ success: boolean; error?: string }> {
-  console.warn('[migration] song-service.ts: updateSongLyrics — no JWT API route yet');
-  void songId;
-  void lyrics;
-  return { success: false, error: 'Song lyrics update unavailable during migration' };
+  const response = await apiClient.patch<ApiEnvelope>(`/songs/${encodeURIComponent(songId)}/lyrics`, { lyrics });
+  return { success: response?.success !== false, error: response?.error };
 }
 
 // HELPER FUNCTIONS

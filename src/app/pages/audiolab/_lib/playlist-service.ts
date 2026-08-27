@@ -1,23 +1,25 @@
 "use client";
 
 import type { Playlist } from '../_types';
+import { apiClient } from '@/lib/api-client';
+
+type ApiEnvelope<T = unknown> = { success?: boolean; data?: T; error?: string };
 
 /**
  * Get all playlists for a specific user
  */
 export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
-  console.warn('[migration] playlist-service.ts: getUserPlaylists — no JWT API route yet');
   void userId;
-  return [];
+  const response = await apiClient.get<ApiEnvelope<Playlist[]>>('/playlists/me');
+  return response?.success === false ? [] : (response?.data || []);
 }
 
 /**
  * Get a single playlist by ID
  */
 export async function getPlaylistById(playlistId: string): Promise<Playlist | null> {
-  console.warn('[migration] playlist-service.ts: getPlaylistById — no JWT API route yet');
-  void playlistId;
-  return null;
+  const response = await apiClient.get<ApiEnvelope<Playlist>>(`/playlists/${encodeURIComponent(playlistId)}`);
+  return response?.success === false ? null : (response?.data || null);
 }
 
 /**
@@ -30,9 +32,9 @@ export async function createPlaylist(data: {
   zoneId?: string;
   isPublic?: boolean;
 }): Promise<string> {
-  console.warn('[migration] playlist-service.ts: createPlaylist — no JWT API route yet');
-  void data;
-  return '';
+  const response = await apiClient.post<ApiEnvelope<{ id?: string }>>('/playlists', data);
+  if (response?.success === false || !response.data?.id) throw new Error(response?.error || 'Failed to create playlist');
+  return response.data.id;
 }
 
 /**
@@ -42,35 +44,32 @@ export async function updatePlaylist(
   playlistId: string,
   data: Partial<Omit<Playlist, 'id' | 'createdAt' | 'updatedAt' | 'userId'>>
 ): Promise<void> {
-  console.warn('[migration] playlist-service.ts: updatePlaylist — no JWT API route yet');
-  void playlistId;
-  void data;
+  const response = await apiClient.patch<ApiEnvelope<unknown>>(`/playlists/${encodeURIComponent(playlistId)}`, data);
+  if (response?.success === false) throw new Error(response.error || 'Failed to update playlist');
 }
 
 /**
  * Delete a playlist
  */
 export async function deletePlaylist(playlistId: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: deletePlaylist — no JWT API route yet');
-  void playlistId;
+  const response = await apiClient.delete<ApiEnvelope<unknown>>(`/playlists/${encodeURIComponent(playlistId)}`);
+  if (response?.success === false) throw new Error(response.error || 'Failed to delete playlist');
 }
 
 /**
  * Add a song to a playlist
  */
 export async function addSongToPlaylist(playlistId: string, songId: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: addSongToPlaylist — no JWT API route yet');
-  void playlistId;
-  void songId;
+  const response = await apiClient.post<ApiEnvelope<unknown>>(`/playlists/${encodeURIComponent(playlistId)}/songs`, { songId });
+  if (response?.success === false) throw new Error(response.error || 'Failed to add song to playlist');
 }
 
 /**
  * Remove a song from a playlist
  */
 export async function removeSongFromPlaylist(playlistId: string, songId: string): Promise<void> {
-  console.warn('[migration] playlist-service.ts: removeSongFromPlaylist — no JWT API route yet');
-  void playlistId;
-  void songId;
+  const response = await apiClient.delete<ApiEnvelope<unknown>>(`/playlists/${encodeURIComponent(playlistId)}/songs/${encodeURIComponent(songId)}`);
+  if (response?.success === false) throw new Error(response.error || 'Failed to remove song from playlist');
 }
 
 /**

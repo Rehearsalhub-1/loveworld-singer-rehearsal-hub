@@ -6,7 +6,7 @@ import { useZone } from '@/hooks/useZone';
 import { isHQGroup, HQ_GROUP_IDS, BOSS_ZONE_ID } from '@/config/zones';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import CustomLoader from '@/components/CustomLoader';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 
 interface ActivityLog {
   id: string;

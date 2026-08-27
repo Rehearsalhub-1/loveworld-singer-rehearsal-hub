@@ -1,18 +1,5 @@
 "use client";
 
-const getAllCloudinaryMedia = async (_t?: any) => [];
-const hasMoreCloudinaryMedia = (_t?: any) => false;
-const loadMoreCloudinaryMedia = async (_t?: any) => [];
-const getFileType = (_f: any, _u?: any) => 'video' as any;
-const uploadToCloudinary = async (_f: any, _p?: any) => ({ url: '', publicId: '' });
-const createCloudinaryMedia = async (_d: any) => {};
-const deleteCloudinaryMedia = async (_id?: any): Promise<any> => ({ success: true });
-const deleteFromCloudinary = async (_id?: any): Promise<any> => ({ success: true });
-const runMediaDiagnostics = async () => [];
-const printDiagnostics = (_d: any) => {};
-type DiagnosticResult = any;
-
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Upload,
@@ -52,6 +39,7 @@ export interface CloudinaryMediaFile {
 import { useZone } from '@/hooks/useZone';
 import { Toast } from './Toast';
 import { apiClient } from '@/lib/api-client';
+import { getFileType, uploadToCloudinary } from '@/lib/cloudinary-storage';
 import CustomLoader from './CustomLoader';
 
 
@@ -114,6 +102,7 @@ export default function MediaManager({
   const [runningDiagnostics, setRunningDiagnostics] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [mediaPage, setMediaPage] = useState(1);
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [fileToDelete, setFileToDelete] = useState<MediaFile | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -141,7 +130,7 @@ export default function MediaManager({
       const startTime = performance.now();
 
       const zoneParam = currentZone?.id ? `&zoneId=${encodeURIComponent(currentZone.id)}` : '';
-      const res = await apiClient.get<any>(`/media?limit=10000${zoneParam}`);
+      const res = await apiClient.get<any>(`/media?limit=200&page=1${zoneParam}`);
       let mediaFiles: any[] = [];
       if (Array.isArray(res)) mediaFiles = res;
       else if (res && typeof res === 'object') {
@@ -149,7 +138,8 @@ export default function MediaManager({
         else if (Array.isArray((res as any).media)) mediaFiles = (res as any).media;
         else if (Array.isArray((res as any).items)) mediaFiles = (res as any).items;
       }
-      setHasMore(false);
+      setMediaPage(1);
+      setHasMore(Number(res?.page || 1) < Number(res?.totalPages || 1));
       setCurrentFilterType(null);
 
       const loadTime = performance.now() - startTime;
@@ -192,8 +182,12 @@ export default function MediaManager({
 
     setIsLoadingMore(true);
     try {
-      const moreFiles: any[] = await (loadMoreCloudinaryMedia as any)(currentZone?.id, 500) || [];
-      setHasMore(Boolean((hasMoreCloudinaryMedia as any)(currentZone?.id)));
+      const nextPage = mediaPage + 1;
+      const zoneParam = currentZone?.id ? `&zoneId=${encodeURIComponent(currentZone.id)}` : '';
+      const response = await apiClient.get<any>(`/media?limit=200&page=${nextPage}${zoneParam}`);
+      const moreFiles: any[] = Array.isArray(response?.data) ? response.data : [];
+      setMediaPage(nextPage);
+      setHasMore(nextPage < Number(response?.totalPages || nextPage));
 
       if (moreFiles.length > 0) {
         const convertedFiles: MediaFile[] = moreFiles.map((dbFile: any) => {
@@ -304,8 +298,16 @@ export default function MediaManager({
         const fileType = getFileType(file.name || file.type);
 
         try {
-        const uploadResult = { url: "", publicId: "" };
-        if (uploadResult) {
+        const uploadedUrl = await uploadToCloudinary(file, (progress) => {
+          setUploadProgress(Math.round(((i + progress / 100) / fileList.length) * 100));
+        }, 'media');
+        const mediaResponse = await apiClient.post<{ success?: boolean; data?: unknown; error?: string }>('/media', {
+          title: file.name,
+          url: uploadedUrl,
+          type: fileType,
+          zoneId: currentZone?.id || 'global',
+        });
+        if (mediaResponse.success !== false) {
           successCount++;
           addToast({
             type: 'success',

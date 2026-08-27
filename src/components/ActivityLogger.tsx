@@ -1,9 +1,8 @@
 "use client";
 
-"use client";
-
 import React, { useEffect } from 'react';
 import { useZone } from '@/hooks/useZone';
+import { apiClient } from '@/lib/api-client';
 
 export function ActivityLogger({ children }: { children?: React.ReactNode }) {
   const { currentZone } = useZone();
@@ -16,12 +15,15 @@ export function ActivityLogger({ children }: { children?: React.ReactNode }) {
 
       // Store any toast that has user/zone info
       if (userName || zoneName) {
-        console.warn('[migration] ActivityLogger.tsx: activity_logs write — no JWT API route yet');
-        void message;
-        void type;
-        void action;
-        void section;
-        void itemName;
+        void apiClient.post('/activity-logs', {
+          action: action || message || 'Admin action',
+          category: section || type || 'general',
+          userName,
+          zoneId: currentZone.id,
+          details: itemName ? `${message || ''} (${itemName})`.trim() : message || '',
+        }).catch((error) => {
+          console.error('[ActivityLogger] Failed to record activity:', error);
+        });
       }
     };
 

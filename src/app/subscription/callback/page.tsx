@@ -1,14 +1,12 @@
 "use client";
 
-const getKingsPayPaymentStatus = async (_ref: string) => ({ status: 'success' });
-
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react'
 
 import { apiClient } from '@/lib/api-client';
 const KingsPayService = {
-  verifyPayment: async (ref: string) => await apiClient.post('/payments/verify', { reference: ref })
+  verifyPayment: async (ref: string) => await apiClient.post('/kingspay/verify', { reference: ref })
 };
 
 import { useSubscription } from '@/contexts/SubscriptionContext'
@@ -31,16 +29,22 @@ function SubscriptionCallbackContent() {
       }
 
       try {
-        // Get payment status from KingsPay
-        const paymentStatus = await getKingsPayPaymentStatus(paymentId)
+        // Verify the payment with the backend; the backend owns provider credentials.
+        const verification = await KingsPayService.verifyPayment(paymentId) as {
+          success?: boolean;
+          data?: { status?: string };
+          error?: string;
+        }
 
-        if (!paymentStatus) {
+        if (!verification?.success) {
           setStatus('failed')
-          setMessage('Could not verify payment status')
+          setMessage(verification?.error || 'Could not verify payment status')
           return
         }
 
-        switch (paymentStatus.status) {
+        const paymentStatus = verification.data || {}
+
+        switch (String(paymentStatus.status || '').toUpperCase()) {
           case 'SUCCESS':
             setStatus('success')
             setMessage('Payment successful! Your subscription has been activated.')

@@ -6,7 +6,7 @@ import {
   ChevronRight, CheckCircle, XCircle, Filter, MapPin, Globe,
   TrendingUp, BarChart3, Layers, Compass, Sparkles, Clock, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import CustomLoader from '@/components/CustomLoader';
 
 const MONTHS = [

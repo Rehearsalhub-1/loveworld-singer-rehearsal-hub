@@ -10,7 +10,7 @@ import {
   CornerDownRight, Smile, MessageCircle, Reply, CheckCheck, Award,
   Sliders, Mic, Volume2, Copy, LayoutGrid, List, Layers, Quote, Radio
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import { useAuth } from '@/stores/authStore';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { useAdminTheme } from './AdminThemeProvider';

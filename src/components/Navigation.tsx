@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Music, Settings, Home, Menu, X, Mic } from 'lucide-react'
+import { Music, Settings, Home, Menu, X, Mic, Radio } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Navigation() {
@@ -13,6 +13,7 @@ export default function Navigation() {
     { href: '/home', label: 'Home', icon: Home },
     { href: '/pages/praise-night', label: 'Program', icon: Music },
     { href: '/pages/audiolab', label: 'AudioLab', icon: Mic },
+    { href: '/pages/status', label: 'Status', icon: Radio },
     { href: '/pages/admin', label: 'Admin', icon: Settings },
   ]
 

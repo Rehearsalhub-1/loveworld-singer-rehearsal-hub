@@ -122,6 +122,16 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentZone?.id]);
 
+  useEffect(() => {
+    apiClient.setActiveScope({
+      zoneId: selectedZoneId !== 'all' ? selectedZoneId : null,
+      churchId: selectedChurchId || null,
+      scope: selectedChurchId
+        ? 'church'
+        : (selectedZoneId !== 'all' ? 'zone' : 'global'),
+    });
+  }, [selectedZoneId, selectedChurchId]);
+
   const setSelectedZoneId = (zoneId: string) => {
     setSelectedZoneIdState(zoneId);
     setSelectedChurchIdState(null); // Clear church scope when switching zones explicitly

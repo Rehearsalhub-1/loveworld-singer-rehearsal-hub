@@ -6,7 +6,7 @@ import {
   Layers, Shield, User, ArrowRight, Check, XCircle, ChevronRight,
   Sparkles, Filter, Building2
 } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { adminApi as apiClient } from '@/lib/admin-api';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 import CustomLoader from '@/components/CustomLoader';
 import { Toast } from '@/components/Toast';

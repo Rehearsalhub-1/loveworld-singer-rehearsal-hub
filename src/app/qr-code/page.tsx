@@ -66,7 +66,7 @@ export default function QRScannerPage() {
     if (!currentZone) return
     const fetchRecentEvents = async () => {
       try {
-        const records = await AttendanceService.getZoneAttendance(currentZone.id, false, 200)
+        const records = await AttendanceService.getZoneAttendance(currentZone.id)
         const uniqueEvents = Array.from(new Set(records.map((r: any) => r.event_name).filter(Boolean))) as string[]
         if (uniqueEvents.length > 0) {
           setRecentEvents(uniqueEvents)

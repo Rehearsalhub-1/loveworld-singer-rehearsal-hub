@@ -3,7 +3,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useZone } from '@/hooks/useZone'
+import { subscribe as subscribeToWebSocket } from '@/hooks/useWebSocket'
 import { uploadToCloudinary } from '@/lib/cloudinary-storage'
+import { apiClient } from '@/lib/api-client'
 import {
   Chat,
   Message,
@@ -37,13 +39,6 @@ import {
   subscribeToTyping
 } from '../_lib/chat-service'
 
-const subscribeToUserPresence = (..._args: any[]): any => () => {};
-const db: any = null;
-const collection = (..._args: any[]): any => ({});
-const query = (..._args: any[]): any => ({});
-const orderBy = (..._args: any[]): any => ({});
-const limit = (..._args: any[]): any => ({});
-const onSnapshot = (..._args: any[]): any => () => {};
 interface ChatContextType {
   // State
   chats: Chat[]
@@ -248,10 +243,14 @@ export function ChatProviderV2({ children }: { children: React.ReactNode }) {
     const otherId = selectedChat.participants.find(id => id !== currentUserId)
     if (!otherId) return
 
-    const unsubscribe = subscribeToUserPresence(otherId, (presence: any) => {
+    const unsubscribe = subscribeToWebSocket('presence', otherId, (data) => {
+      const presence = data as { isOnline?: boolean; lastSeen?: number };
       setUserPresence(prev => ({
         ...prev,
-        [otherId]: presence
+        [otherId]: {
+          status: presence.isOnline ? 'online' : 'offline',
+          lastSeen: presence.lastSeen || Date.now(),
+        }
       }))
     })
 
@@ -274,31 +273,8 @@ export function ChatProviderV2({ children }: { children: React.ReactNode }) {
     return () => unsubscribes.forEach(unsub => unsub())
   }, [currentUserId, chats.length]) // Only rebinding if user or chat count changes
 
-  // Subscribe to Statuses
   useEffect(() => {
-    if (!user?.uid) return
-    const q = query(collection(db, 'statuses_v2'), orderBy('timestamp', 'desc'), limit(100))
-    const unsub = onSnapshot(q, (snap: any) => {
-      const now = Date.now()
-      const dayAgo = now - 24 * 60 * 60 * 1000
-      const activeStatuses = (snap?.docs || [])
-        .map((d: any) => ({ id: d.id, ...d.data() } as StatusUpdate))
-        .filter((s: any) => {
-          const ts = s.timestamp?.toMillis?.() || s.timestamp || now
-          return ts > dayAgo
-        })
-      setStatuses(activeStatuses)
-    }, (err: any) => {
-       console.error('[ChatContext] Status subscription error:', err)
-       // If index missing, fallback to no order
-       if (err?.message?.includes('index')) {
-          const fallbackQ = query(collection(db, 'statuses_v2'), limit(100));
-          onSnapshot(fallbackQ, (s: any) => {
-             setStatuses((s?.docs || []).map((d: any) => ({ id: d.id, ...d.data() } as StatusUpdate)))
-          })
-       }
-    })
-    return () => unsub()
+    setStatuses([])
   }, [user?.uid])
 
   // Actions
@@ -631,26 +607,39 @@ export function ChatProviderV2({ children }: { children: React.ReactNode }) {
     if (!currentUser) return false
     try {
       const finalUrl = await uploadToCloudinary(file, undefined, 'status')
-      console.warn('[migration] uploadStatus — status uploaded to R2:', finalUrl)
-      return true
+      const response = await apiClient.post<{ success?: boolean }>('/statuses', {
+        mediaUrl: finalUrl,
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+        caption: caption || '',
+        trimOptions,
+      })
+      return response.success !== false
     } catch (e) {
       console.error('[ChatContext] uploadStatus error:', e)
       return false
     }
   }, [currentUser, currentZone])
 
-  const viewStatus = useCallback(async (_statusId: string) => {
-    console.warn('[migration] viewStatus — statuses_v2 write not on JWT API yet')
+  const viewStatus = useCallback(async (statusId: string) => {
+    await apiClient.post(`/statuses/${encodeURIComponent(statusId)}/view`)
   }, [])
 
-  const deleteStatus = useCallback(async (_statusId: string) => {
-    console.warn('[migration] deleteStatus — statuses_v2 write not on JWT API yet')
-    return false
+  const deleteStatus = useCallback(async (statusId: string) => {
+    try {
+      const response = await apiClient.delete<{ success?: boolean }>(`/statuses/${encodeURIComponent(statusId)}`)
+      return response.success !== false
+    } catch {
+      return false
+    }
   }, [])
 
-  const toggleStatusLike = useCallback(async (_statusId: string) => {
-    console.warn('[migration] toggleStatusLike — statuses_v2 write not on JWT API yet')
-    return false
+  const toggleStatusLike = useCallback(async (statusId: string) => {
+    try {
+      const response = await apiClient.post<{ success?: boolean }>(`/statuses/${encodeURIComponent(statusId)}/like`)
+      return response.success !== false
+    } catch {
+      return false
+    }
   }, [])
 
   return (

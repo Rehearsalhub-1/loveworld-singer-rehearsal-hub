@@ -17,8 +17,6 @@ interface ChatListProps {
   onNewChat: () => void
   onNewGroup: () => void
   onBack?: () => void
-  onToggleMoments?: () => void
-  isMomentsActive?: boolean
   primaryColor: string
   allTypingUsers?: any
 }
@@ -87,8 +85,6 @@ export function ChatList({
   onNewChat,
   onNewGroup,
   onBack,
-  onToggleMoments,
-  isMomentsActive = false,
   primaryColor,
   allTypingUsers = {}
 }: ChatListProps) {
@@ -247,18 +243,6 @@ export function ChatList({
           </div>
 
           <div className="flex items-center gap-1.5 text-slate-600">
-            <button
-              onClick={onToggleMoments}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 ${
-                isMomentsActive
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-pink-900/30 ring-2 ring-pink-400'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-purple-900/20'
-              }`}
-              title="Choir Moments & Reels"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Moments</span>
-            </button>
             <button
               onClick={onNewGroup}
               className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors text-slate-600 active:scale-95"

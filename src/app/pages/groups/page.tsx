@@ -22,7 +22,6 @@ import { useCall } from '@/contexts/CallContext'
 import { ChatList } from './_components/ChatList'
 import { ChatWindow } from './_components/ChatWindow'
 import { SyncAvatar } from './_components/SyncAvatar'
-import { MomentsFeedEmbed } from './_components/MomentsFeedEmbed'
 
 // Reaction options
 const REACTIONS: ReactionType[] = ['❤️', '👍', '😂', '😮', '😢', '🙏', '🔥', '👏', '💯', '✨']
@@ -76,7 +75,7 @@ function GroupsContent() {
     allTypingUsers = {}
   } = useChatV2()
 
-  const [activeView, setActiveView] = useState<'chats' | 'moments'>('chats')
+  const [activeView, setActiveView] = useState<'chats'>('chats')
   const [showNewChat, setShowNewChat] = useState(false)
   const [showNewGroup, setShowNewGroup] = useState(false)
   const [showGroupSettings, setShowGroupSettings] = useState(false)
@@ -428,18 +427,6 @@ function GroupsContent() {
           </button>
           
           <button
-            onClick={() => { setActiveView('moments'); selectChat(null); }}
-            className={`relative w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-xs ${
-              activeView === 'moments'
-                ? 'bg-gradient-to-tr from-purple-600 to-pink-600 text-white shadow-pink-900/30 ring-2 ring-pink-400'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'
-            }`}
-            title="Choir Moments & Reels"
-          >
-            <Camera className="w-5 h-5" />
-          </button>
-
-          <button
             onClick={() => { setActiveView('chats'); setShowNewGroup(true); }}
             className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors"
             title="Groups"
@@ -479,21 +466,11 @@ function GroupsContent() {
           onNewChat={() => setShowNewChat(true)}
           onNewGroup={() => setShowNewGroup(true)}
           onBack={() => router.push('/home')}
-          onToggleMoments={() => { setActiveView(prev => prev === 'moments' ? 'chats' : 'moments'); selectChat(null); }}
-          isMomentsActive={activeView === 'moments'}
           primaryColor={primaryColor}
         />
 
         <div className="flex-1 flex flex-col min-w-0 bg-white relative">
-          {activeView === 'moments' ? (
-            <MomentsFeedEmbed 
-              primaryColor={primaryColor} 
-              onDirectMessage={(uid, name) => {
-                setActiveView('chats');
-                startDirectChat({ id: uid, name: name });
-              }}
-            />
-          ) : selectedChat ? (
+          {selectedChat ? (
             <ChatWindow 
               primaryColor={primaryColor}
               onBackToList={() => selectChat(null)}
@@ -519,7 +496,7 @@ function GroupsContent() {
               </div>
               <h2 className="text-base font-black text-slate-800 mb-1 tracking-tight">Rehearsal Hub</h2>
               <p className="text-slate-400 text-xs font-medium max-w-[260px] text-center leading-relaxed">
-                Select a conversation or tap Moments to view choir reels.
+                Select a conversation to continue messaging.
               </p>
             </div>
           )}

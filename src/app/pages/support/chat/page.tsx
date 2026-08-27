@@ -17,12 +17,6 @@ import {
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { HQ_ADMIN_EMAILS } from '@/config/roles';
 
-import { BackendAPI } from '@/lib/api-client';
-const DataService = {
-  subscribeToChatMessages: (_id: string, cb: any) => { cb([]); return () => {}; },
-  sendChatMessage: async (data: any) => await BackendAPI.generic.create('support_chat', data)
-};
-
 import type { UserProfile } from '@/types/supabase';
 import { apiClient } from '@/lib/api-client';
 
@@ -42,7 +36,10 @@ export default function ChatSupportPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [ticketId, setTicketId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [adminProfiles, setAdminProfiles] = useState<UserProfile[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +51,43 @@ export default function ChatSupportPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const loadSupportConversation = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError('');
+    try {
+      const ticketsResponse = await apiClient.get<{ success: boolean; data?: Array<{ id: string }> }>('/support');
+      const latestTicket = ticketsResponse.data?.[0];
+      if (!latestTicket) return;
+
+      setTicketId(latestTicket.id);
+      const messagesResponse = await apiClient.get<{ success: boolean; data?: ChatMessage[] }>(
+        `/support/${encodeURIComponent(latestTicket.id)}/messages`,
+      );
+      setMessages((messagesResponse.data || []).map((message) => ({
+        ...message,
+        isCurrentUser: message.senderId === user.id,
+      })));
+    } catch (error) {
+      console.error('Error loading support conversation:', error);
+      setLoadError('Unable to load your support conversation. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSupportConversation();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!loading) scrollToBottom();
+  }, [messages.length, loading]);
 
   // Fetch Admin Profiles for Header
   useEffect(() => {
@@ -74,14 +108,35 @@ export default function ChatSupportPage() {
   }, []);
 
   const sendMessage = async () => {
-    if (newMessage.trim() === '' || !user?.id) return;
+    const text = newMessage.trim();
+    if (!text || !user?.id || sending) return;
 
-    const textToSend = newMessage;
     setNewMessage('');
+    setSending(true);
+    setLoadError('');
+    try {
+      let response: { success: boolean; data?: { id: string } };
+      if (ticketId) {
+        response = await apiClient.post(`/support/${encodeURIComponent(ticketId)}/messages`, { message: text });
+      } else {
+        response = await apiClient.post('/support', {
+          subject: 'Support Request',
+          category: 'general',
+          priority: 'normal',
+          message: text,
+        });
+        if (response.data?.id) setTicketId(response.data.id);
+      }
 
-    console.warn('[migration] support/chat/page.tsx: sendMessage — no JWT API route yet');
-    void textToSend;
-    void currentUser;
+      if (!response.success) throw new Error('Support request failed');
+      await loadSupportConversation();
+    } catch (error) {
+      console.error('Error sending support message:', error);
+      setNewMessage(text);
+      setLoadError('Message could not be sent. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -155,7 +210,14 @@ export default function ChatSupportPage() {
         <div className="max-w-2xl mx-auto space-y-6">
 
           {/* Welcome Message Card */}
-          {messages.length === 0 && !loading && (
+          {loadError && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-700 flex items-center justify-between gap-3">
+              <span>{loadError}</span>
+              <button onClick={loadSupportConversation} className="font-semibold underline">Retry</button>
+            </div>
+          )}
+
+          {messages.length === 0 && !loading && !loadError && (
             <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm text-center my-8">
               <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <MessageCircle className="w-8 h-8 text-indigo-600" />
@@ -199,9 +261,9 @@ export default function ChatSupportPage() {
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
                       <div className={`flex items-center justify-end mt-1 opacity-60`}>
                         <span className="text-[9px] font-medium uppercase tracking-tighter">
-                          {message.timestamp?.toDate ?
-                            message.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-                            'Syncing...'}
+                          {message.timestamp
+                            ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : 'Syncing...'}
                         </span>
                       </div>
                     </div>
@@ -236,7 +298,7 @@ export default function ChatSupportPage() {
             />
             <button
               onClick={sendMessage}
-              disabled={!newMessage.trim()}
+              disabled={!newMessage.trim() || sending}
               className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center hover:bg-indigo-700 transition-all disabled:opacity-30 disabled:grayscale active:scale-90 shadow-md shadow-indigo-200"
             >
               <Send className="w-5 h-5" />

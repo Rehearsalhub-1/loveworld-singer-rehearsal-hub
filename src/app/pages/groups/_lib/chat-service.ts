@@ -22,14 +22,7 @@ import {
   apiDeleteMessage 
 } from './chat-api-writes'
 import { apiClient, BackendAPI } from '@/lib/api-client';
-
-const db: any = null;
-const collection = (..._args: any[]): any => ({});
-const query = (..._args: any[]): any => ({});
-const where = (..._args: any[]): any => ({});
-const orderBy = (..._args: any[]): any => ({});
-const limit = (..._args: any[]): any => ({});
-const onSnapshot = (..._args: any[]): any => () => {};
+import { subscribe as subscribeToWebSocket } from '@/hooks/useWebSocket';
 
 export interface ChatUser {
   id: string
@@ -695,20 +688,37 @@ export async function setTypingStatus(
  * Subscribe to typing status
  */
 export function subscribeToTyping(chatId: string, currentUserId: string, callback: (typingUsers: { userName: string, status: string }[]) => void): () => void {
-  const q = query(collection(db, TYPING_COLLECTION), where('chatId', '==', chatId))
-  return onSnapshot(q, (snap: any) => {
-    const now = Date.now()
-    const users = (snap?.docs || [])
-      .map((d: any) => d.data())
-      .filter((d: any) => d.userId !== currentUserId)
-      .filter((d: any) => {
-        // Handle potential serverTimestamp lag: if timestamp is null, it's very recent (locally sent)
-        const ts = d.timestamp?.toMillis?.() || d.timestamp || now
-        return now - ts < 15000 // 15 second window for safety
-      })
-      .map((d: any) => ({ userName: d.userName, status: d.status }))
-    callback(users)
-  })
+  const activeUsers = new Map<string, { userName: string; status: string }>();
+  const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const emit = () => callback(Array.from(activeUsers.values()));
+
+  const unsubscribe = subscribeToWebSocket('typing', chatId, (data) => {
+    const event = data as { userId?: string; userName?: string; status?: string };
+    if (!event.userId || event.userId === currentUserId) return;
+
+    const previousTimer = expiryTimers.get(event.userId);
+    if (previousTimer) clearTimeout(previousTimer);
+
+    if (!event.status) {
+      activeUsers.delete(event.userId);
+      expiryTimers.delete(event.userId);
+      emit();
+      return;
+    }
+
+    activeUsers.set(event.userId, { userName: event.userName || 'User', status: event.status });
+    expiryTimers.set(event.userId, setTimeout(() => {
+      activeUsers.delete(event.userId!);
+      expiryTimers.delete(event.userId!);
+      emit();
+    }, 15000));
+    emit();
+  });
+
+  return () => {
+    unsubscribe();
+    expiryTimers.forEach((timer) => clearTimeout(timer));
+  };
 }
 
 // GROUP MANAGEMENT

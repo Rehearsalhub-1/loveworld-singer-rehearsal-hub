@@ -11,23 +11,17 @@ import CustomLoader from '@/components/CustomLoader';
 import { PraiseNightSong, PraiseNight, Category } from '../../types/supabase';
 import { useZone } from '@/hooks/useZone';
 import { useAuth } from '@/stores/authStore';
-import { isHQAdminEmail } from '@/config/roles';
 import { isHQGroup } from '@/config/zones';
+import { canAccessAdminSection, getAdminPermissions } from '@/config/admin-permissions';
 const ZoneDatabaseService = {
   createPraiseNight: async (zoneId: string, data: any, churchId?: string | null) => {
     try {
       if (churchId || data?.subGroupId || data?.churchId) {
         const sgId = churchId || data.subGroupId || data.churchId;
-        const res = await apiClient.post<{ success: boolean; data?: { id?: string }; error?: string }>(
-          '/subgroups/praise-nights',
-          { ...data, subGroupId: sgId }
-        );
+        const res = await adminApi.programs.create(data, { churchId: sgId });
         return { success: res?.success !== false, id: res?.data?.id, error: res?.error };
       }
-      const res = await apiClient.post<{ success: boolean; data?: { id?: string }; error?: string }>('/programs', {
-        ...data,
-        zoneId: zoneId || 'zone-001',
-      });
+      const res = await adminApi.programs.create(data, { zoneId: zoneId || 'zone-001' });
       return { success: res?.success !== false, id: res?.data?.id, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to create program' };
@@ -37,16 +31,10 @@ const ZoneDatabaseService = {
   updatePraiseNight: async (id: string, data: any, zoneId?: string) => {
     try {
       if (data?.subGroupId || data?.churchId) {
-        const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(
-          `/subgroups/praise-nights/${encodeURIComponent(id)}`,
-          data
-        );
+        const res = await adminApi.programs.update(id, data, { churchId: data.subGroupId || data.churchId });
         return { success: res?.success !== false, id, error: res?.error };
       }
-      const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(`/programs/${encodeURIComponent(id)}`, {
-        ...data,
-        ...(zoneId ? { zoneId } : {}),
-      });
+      const res = await adminApi.programs.update(id, data, { zoneId });
       return { success: res?.success !== false, id, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update program' };
@@ -55,7 +43,7 @@ const ZoneDatabaseService = {
 
   deletePraiseNight: async (id: string, _zoneId?: string) => {
     try {
-      const res = await apiClient.delete<{ success: boolean; error?: string }>(`/programs/${encodeURIComponent(id)}`);
+      const res = await adminApi.programs.remove(id);
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to delete program' };
@@ -64,10 +52,7 @@ const ZoneDatabaseService = {
 
   getCategories: async (zoneId?: string) => {
     try {
-      const url = (zoneId && zoneId !== 'all' && zoneId !== 'global') 
-        ? `/categories?zoneId=${encodeURIComponent(zoneId)}` 
-        : '/categories';
-      const res = await apiClient.get<{ success: boolean; data: any[] }>(url);
+      const res = await adminApi.categories.list(zoneId);
       return Array.isArray(res?.data) ? res.data : [];
     } catch {
       return [];
@@ -76,10 +61,7 @@ const ZoneDatabaseService = {
 
   createCategory: async (zoneId: string, data: any) => {
     try {
-      const res = await apiClient.post<{ success: boolean; data?: any; error?: string }>('/categories', {
-        ...data,
-        zoneId,
-      });
+      const res = await adminApi.categories.create({ ...data, zoneId });
       return { success: res?.success !== false, data: res?.data, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to create category' };
@@ -88,10 +70,7 @@ const ZoneDatabaseService = {
 
   updateCategory: async (zoneId: string, id: string, data: any) => {
     try {
-      const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(`/categories/${encodeURIComponent(id)}`, {
-        ...data,
-        zoneId,
-      });
+      const res = await adminApi.categories.update(id, { ...data, zoneId });
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update category' };
@@ -100,7 +79,7 @@ const ZoneDatabaseService = {
 
   deleteCategory: async (zoneId: string, id: string) => {
     try {
-      const res = await apiClient.delete<{ success: boolean; error?: string }>(`/categories/${encodeURIComponent(id)}`);
+      const res = await adminApi.categories.remove(id);
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to delete category' };
@@ -109,10 +88,7 @@ const ZoneDatabaseService = {
 
   getPageCategories: async (zoneId?: string) => {
     try {
-      const path = zoneId && zoneId !== 'zone-001' && !zoneId.toLowerCase().includes('hq')
-        ? `/categories/zone-page?zoneId=${encodeURIComponent(zoneId)}`
-        : '/categories/page';
-      const res = await apiClient.get<{ success: boolean; data: any[] }>(path);
+      const res = await adminApi.categories.pageList(zoneId);
       return Array.isArray(res?.data) ? res.data : [];
     } catch {
       return [];
@@ -121,10 +97,7 @@ const ZoneDatabaseService = {
 
   createPageCategory: async (zoneId: string, data: any) => {
     try {
-      const res = await apiClient.post<{ success: boolean; data?: any; error?: string }>('/categories/page', {
-        ...data,
-        zoneId,
-      });
+      const res = await adminApi.categories.pageCreate({ ...data, zoneId });
       return { success: res?.success !== false, id: res?.data?.id, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to create page category' };
@@ -133,10 +106,7 @@ const ZoneDatabaseService = {
 
   updatePageCategory: async (zoneId: string, id: string, data: any) => {
     try {
-      const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(`/categories/page/${encodeURIComponent(id)}`, {
-        ...data,
-        zoneId,
-      });
+      const res = await adminApi.categories.pageUpdate(id, { ...data, zoneId });
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update page category' };
@@ -145,7 +115,7 @@ const ZoneDatabaseService = {
 
   deletePageCategory: async (zoneId: string, id: string) => {
     try {
-      const res = await apiClient.delete<{ success: boolean; error?: string }>(`/categories/page/${encodeURIComponent(id)}`);
+      const res = await adminApi.categories.pageRemove(id);
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to delete page category' };
@@ -154,7 +124,7 @@ const ZoneDatabaseService = {
 
   updatePageCategoryOrder: async (zoneId: string, order: any[]) => {
     try {
-      const res = await apiClient.post<{ success: boolean; error?: string }>('/categories/page/order', { order, zoneId });
+      const res = await adminApi.categories.pageReorder(order, zoneId);
       if (res && res.success === false) {
         return { success: false, error: res.error || 'Failed to update order' };
       }
@@ -168,10 +138,7 @@ const ZoneDatabaseService = {
 const PraiseNightSongsService = {
   createSong: async (data: any, zoneId?: string) => {
     try {
-      const res = await apiClient.post<{ success: boolean; data?: any; error?: string }>('/songs/praise-night', {
-        ...data,
-        ...(zoneId ? { zoneId } : {}),
-      });
+      const res = await adminApi.songs.create(data, zoneId);
       return { success: res?.success !== false, id: res?.data?.id, data: res?.data, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to create song' };
@@ -180,10 +147,7 @@ const PraiseNightSongsService = {
 
   updateSong: async (id: string, data: any, zoneId?: string) => {
     try {
-      const res = await apiClient.patch<{ success: boolean; data?: any; error?: string }>(`/songs/praise-night/${encodeURIComponent(id)}`, {
-        ...data,
-        ...(zoneId ? { zoneId } : {}),
-      });
+      const res = await adminApi.songs.update(id, data, zoneId);
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update song' };
@@ -192,7 +156,7 @@ const PraiseNightSongsService = {
 
   deleteSong: async (id: string, _zoneId?: string) => {
     try {
-      const res = await apiClient.delete<{ success: boolean; error?: string }>(`/songs/praise-night/${encodeURIComponent(id)}`);
+      const res = await adminApi.songs.remove(id);
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to delete song' };
@@ -201,23 +165,27 @@ const PraiseNightSongsService = {
 
   updateSongStatus: async (id: string, status: string, _zoneId?: string) => {
     try {
-      const res = await apiClient.patch<{ success: boolean; error?: string }>(`/songs/praise-night/${encodeURIComponent(id)}/status`, {
-        status,
-      });
+      const res = await adminApi.songs.updateStatus(id, status);
       return { success: res?.success !== false, error: res?.error };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Failed to update song status' };
     }
   },
 };
-const logAdminAction: Record<string, any> = {
-  deletePage: (_admin: any, _msg: string) => {},
-  updateSong: (_admin: any, _msg: string) => {},
-  addSong: (_admin: any, _title: string, _cat?: string) => {},
-  deleteSong: (_admin: any, _title: string) => {},
-  updateCategory: (_admin: any, _msg: string) => {},
-  deleteCategory: (_admin: any, _msg: string) => {},
-  createCategory: (_admin: any, _title: string) => {},
+const logAdminAction = {
+  record: (admin: any, action: string, details: string) => adminApi.post('/activity-logs', {
+    action,
+    category: 'admin',
+    userName: admin?.fullName || admin?.username,
+    details,
+  }),
+  deletePage: (admin: any, message: string) => logAdminAction.record(admin, 'deleted', message),
+  updateSong: (admin: any, message: string) => logAdminAction.record(admin, 'updated', message),
+  addSong: (admin: any, title: string, category?: string) => logAdminAction.record(admin, 'created', `Added song: ${title}${category ? ` (${category})` : ''}`),
+  deleteSong: (admin: any, title: string) => logAdminAction.record(admin, 'deleted', `Deleted song: ${title}`),
+  updateCategory: (admin: any, message: string) => logAdminAction.record(admin, 'updated', message),
+  deleteCategory: (admin: any, message: string) => logAdminAction.record(admin, 'deleted', message),
+  createCategory: (admin: any, title: string) => logAdminAction.record(admin, 'created', `Created category: ${title}`),
 };
 import { uploadBannerImage } from '@/utils/imageUpload';
 import { ToastContainer, Toast } from '../../components/Toast';
@@ -229,15 +197,29 @@ import AdminZoneHeader from '../../components/admin/AdminZoneHeader';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import AdminMobileNav from '../../components/admin/AdminMobileNav';
 import AdminMobileHeader from '../../components/admin/AdminMobileHeader';
-function useZoneSubGroups(_zoneId?: string) {
-  return { subGroups: [] as any[], pendingCount: 0, loading: false, error: null };
+function useZoneSubGroups(zoneId?: string) {
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    if (!zoneId) return () => { active = false; };
+    adminApi.members.pendingRequests(zoneId)
+      .then((response) => {
+        if (active) setPendingCount(Array.isArray(response.data) ? response.data.length : 0);
+      })
+      .catch(() => {
+        if (active) setPendingCount(0);
+      });
+    return () => { active = false; };
+  }, [zoneId]);
+
+  return { subGroups: [] as any[], pendingCount, loading: false, error: null };
 }
-import { apiClient } from '@/lib/api-client';
+import { adminApi } from '@/lib/admin-api';
 
 // Dynamic imports for improved hydration and performance
 const PagesSection = dynamic(() => import('../../components/admin/PagesSection'), { ssr: false });
 const CategoriesSection = dynamic(() => import('../../components/admin/CategoriesSection'), { ssr: false });
-const MediaSection = () => null;
 const MediaUploadSection = dynamic(() => import('../../components/admin/MediaUploadSection'), { ssr: false });
 const MembersSection = dynamic(() => import('../../components/admin/MembersSection'), { ssr: false });
 const SimpleNotificationsSection = dynamic(() => import('../../components/admin/SimpleNotificationsSection'), { ssr: false });
@@ -257,14 +239,13 @@ const PageCategoryOrderModal = dynamic(() => import('../../components/admin/Page
 const SchedulingBoardSection = dynamic(() => import('../../components/admin/SchedulingBoardSection'), { ssr: false });
 const KaraokeConfigSection = dynamic(() => import('../../components/admin/KaraokeConfigSection'), { ssr: false });
 const AttendanceSection = dynamic(() => import('../../components/admin/AttendanceSection'), { ssr: false });
-const LexiconAISection = () => null;
 const AppUpdatesSection = dynamic(() => import('../../components/admin/AppUpdatesSection'), { ssr: false });
 const GeofenceConfigSection = dynamic(() => import('../../components/admin/GeofenceConfigSection'), { ssr: false });
 
 function AdminContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, profile, isLoading: authLoading } = useAuth();
+  const { user, profile, signOut, isLoading: authLoading } = useAuth();
 
   // Hydration guard - must be the first state
   const [hasMounted, setHasMounted] = React.useState(false);
@@ -285,7 +266,7 @@ function AdminContent() {
   } = useAdminZone();
 
   // Sub-group management (for Zone Coordinators) - must be called before any conditional returns
-  const { pendingCount: pendingSubGroupCount } = useZoneSubGroups();
+  const { pendingCount: pendingSubGroupCount } = useZoneSubGroups(currentZone?.id);
 
   // Admin authentication state
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; username: string; fullName: string } | null>(null);
@@ -305,13 +286,10 @@ function AdminContent() {
   }, [user, profile, currentZone]);
 
   const userEmail = profile?.email?.toLowerCase() || '';
-  const isHQAdmin = Boolean(userEmail && isHQAdminEmail(userEmail));
-
-  const isJoyKures = userEmail === 'joykures@gmail.com';
-  const isUsman = userEmail === 'usmanrazaqj@gmail.com';
-  const isRestrictedAdmin = isJoyKures || isUsman;
-  
-  const allowedSections = isJoyKures ? ['Pages'] : isUsman ? ['Master Library', 'Karaoke Config'] : null;
+  const permissions = getAdminPermissions(profile?.role, profile?.hasHqAccess === true || (profile as any)?.has_hq_access === true);
+  const isHQAdmin = permissions.isHQ;
+  const isRestrictedAdmin = false;
+  const allowedSections = null;
 
   const initialSectionFromUrl = searchParams.get('section') || searchParams.get('tab');
 
@@ -326,8 +304,6 @@ function AdminContent() {
   // UI state
   const [activeSection, setActiveSection] = useState(() => {
     if (initialSectionFromUrl) return initialSectionFromUrl;
-    if (isJoyKures) return 'Pages';
-    if (isUsman) return 'Master Library';
     if (isChurchAdminOnly) return 'Churches';
     return 'Dashboard';
   });
@@ -400,18 +376,12 @@ function AdminContent() {
   const fetchPrograms = useCallback(async () => {
     try {
       setLoading(true);
-      let url = '';
-      if (isChurchScope && selectedChurchId) {
-        url = `/subgroups/${encodeURIComponent(selectedChurchId)}/praise-nights`;
-      } else if (!isGlobalView && selectedZoneId) {
-        url = `/programs?zoneId=${encodeURIComponent(selectedZoneId)}`;
-      } else {
-        url = '/programs';
-      }
-
-      const res = await apiClient.get<{ success: boolean; data: PraiseNight[] }>(url);
+      const res = await adminApi.programs.list({
+        churchId: isChurchScope ? selectedChurchId : null,
+        zoneId: isGlobalView ? null : selectedZoneId,
+      });
       if (res?.success !== false && Array.isArray(res?.data)) {
-        setAllPraiseNights(res.data);
+        setAllPraiseNights(res.data as unknown as PraiseNight[]);
       } else {
         setAllPraiseNights([]);
       }
@@ -426,54 +396,18 @@ function AdminContent() {
     fetchPrograms();
   }, [fetchPrograms]);
 
-  // Automatically load songs whenever selectedPage changes
-  useEffect(() => {
-    if (!selectedPage?.id) {
-      setAllSongs([]);
-      return;
-    }
-
-    const loadSongs = async () => {
-      try {
-        setLoading(true);
-        let url = '';
-        if (isChurchScope && selectedChurchId) {
-          url = `/subgroups/${encodeURIComponent(selectedChurchId)}/songs`;
-        } else {
-          url = `/songs/praise-night?pageId=${encodeURIComponent(selectedPage.id)}`;
-        }
-        const res = await apiClient.get<{ success: boolean; data: PraiseNightSong[] }>(url);
-        if (res?.success !== false && Array.isArray(res?.data)) {
-          setAllSongs(res.data);
-        } else {
-          setAllSongs([]);
-        }
-      } catch (err) {
-        console.error('Error loading songs for page:', err);
-        setAllSongs([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadSongs();
-  }, [selectedPage, isChurchScope, selectedChurchId]);
-
   const refreshData = fetchPrograms;
   const setZoneId = (_id?: string) => {};
   const getCurrentPage = () => selectedPage;
   const getCurrentSongs = useCallback(async (programId?: string, _flag?: boolean): Promise<PraiseNightSong[]> => {
     if (!programId) return [];
     try {
-      let url = '';
-      if (isChurchScope && selectedChurchId) {
-        url = `/subgroups/${encodeURIComponent(selectedChurchId)}/songs`;
-      } else {
-        const effectiveZone = isGlobalView ? '' : `&zoneId=${encodeURIComponent(selectedZoneId || '')}`;
-        url = `/songs/praise-night?programId=${encodeURIComponent(programId)}${effectiveZone}`;
-      }
-      const res = await apiClient.get<{ success: boolean; data: PraiseNightSong[] }>(url);
-      return Array.isArray(res?.data) ? res.data : [];
+      const res = await adminApi.songs.list({
+        programId,
+        churchId: isChurchScope ? selectedChurchId : null,
+        zoneId: isGlobalView ? null : selectedZoneId,
+      });
+      return Array.isArray(res?.data) ? res.data as unknown as PraiseNightSong[] : [];
     } catch (err) {
       console.error('Error loading songs for program:', err);
       return [];
@@ -693,11 +627,9 @@ function AdminContent() {
       return
     }
 
-    const isHQAdminCheck = Boolean(profile?.email && isHQAdminEmail(profile.email))
-
     // Give a small delay to ensure zone role is properly loaded from cache
     const checkAccess = () => {
-      if (!isZoneCoordinator && !isHQAdminCheck) {
+      if (!isZoneCoordinator && !isHQAdmin) {
         router.push('/home')
         return
       }
@@ -711,7 +643,7 @@ function AdminContent() {
     // Small delay to ensure zone data is fully loaded from cache
     const timer = setTimeout(checkAccess, 500)
     return () => clearTimeout(timer)
-  }, [user, isZoneCoordinator, currentZone, zoneLoading, router, hasCheckedAuth, profile?.email, authLoading]);
+  }, [user, isZoneCoordinator, isHQAdmin, currentZone, zoneLoading, router, hasCheckedAuth, profile?.email, authLoading]);
 
   const pages = useMemo(() => {
 
@@ -808,9 +740,6 @@ function AdminContent() {
 
   // But we still need handleAdminLogout for the sidebar
   const handleAdminLogout = () => {
-    if (currentAdmin) {
-    }
-
     setCurrentAdmin(null);
     setIsAuthenticated(false);
     localStorage.removeItem('admin_session');
@@ -820,8 +749,7 @@ function AdminContent() {
       message: 'You have been successfully logged out.'
     });
 
-    // Force page reload to show login screen
-    window.location.reload();
+    void signOut().finally(() => window.location.reload());
   };
 
   // Category management functions
@@ -1906,9 +1834,7 @@ function AdminContent() {
   const isHQ = currentZone ? isHQGroup(currentZone.id) : false;
 
   const canSeeSection = (sectionName: string) => {
-    if (!isRestrictedAdmin) return true;
-    if (allowedSections) return allowedSections.includes(sectionName);
-    return false;
+    return canAccessAdminSection(permissions, sectionName);
   };
 
   // Add PageCategoriesSection to the active sections
@@ -1936,7 +1862,6 @@ function AdminContent() {
           {activeSection === 'Analytics' && isHQAdmin && canSeeSection('Analytics') && <AnalyticsSection />}
           {activeSection === 'Payments' && isHQAdmin && canSeeSection('Payments') && <PaymentDashboardSection />}
           {activeSection === 'Attendance' && canSeeSection('Attendance') && <AttendanceSection />}
-          {activeSection === 'Lexicon Training' && canSeeSection('Lexicon Training') && <LexiconAISection />}
           {activeSection === 'Geofence Config' && <GeofenceConfigSection />}
 
           {activeSection === 'Pages' && canSeeSection('Pages') && (
@@ -2100,13 +2025,13 @@ function AdminContent() {
           )}
           {activeSection === 'Members' && canSeeSection('Members') && <MembersSection />}
           {activeSection === 'Media' && canSeeSection('Media') && <MediaUploadSection />}
-          {activeSection === 'Master Library' && canSeeSection('Master Library') && <MasterLibrarySection isHQAdmin={isHQAdmin} />}
+          {activeSection === 'Master Library' && canSeeSection('Master Library') && <MasterLibrarySection isHQAdmin={isHQAdmin && permissions.role !== 'boss'} />}
           {(activeSection === 'Churches' || activeSection === 'Sub-Groups') && (canSeeSection('Churches') || canSeeSection('Sub-Groups')) && <SubGroupsSection addToast={addToast} />}
-          {activeSection === 'Calendar' && canSeeSection('Calendar') && <CalendarSection />}
-          {activeSection === 'Notifications' && isHQAdmin && canSeeSection('Notifications') && <SimpleNotificationsSection />}
+          {activeSection === 'Calendar' && canSeeSection('Calendar') && <CalendarSection readOnly={permissions.role === 'boss'} />}
+          {activeSection === 'Notifications' && isHQAdmin && canSeeSection('Notifications') && <SimpleNotificationsSection readOnly={permissions.role === 'boss'} />}
           {activeSection === 'Activity Logs' && canSeeSection('Activity Logs') && <ActivityLogsPage />}
           {activeSection === 'Support Chat' && isHQAdmin && canSeeSection('Support Chat') && <SupportChatSection />}
-          {activeSection === 'Schedule Manager' && canSeeSection('Schedule Manager') && <SchedulingBoardSection />}
+          {activeSection === 'Schedule Manager' && canSeeSection('Schedule Manager') && <SchedulingBoardSection readOnly={permissions.role === 'boss'} />}
           {(activeSection === 'Playback Mode' || activeSection === 'Karaoke Config') && isHQ && (canSeeSection('Playback Mode') || canSeeSection('Karaoke Config')) && <KaraokeConfigSection />}
           {activeSection === 'App Updates' && isHQAdmin && canSeeSection('App Updates') && <AppUpdatesSection />}
         </div>
