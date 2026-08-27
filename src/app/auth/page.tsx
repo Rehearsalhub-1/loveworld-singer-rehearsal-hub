@@ -156,11 +156,11 @@ function AuthPageContent() {
       });
 
       if (res.success && res.data) {
-        apiClient.setAccessToken(res.data.accessToken);
+        apiClient.setAccessToken(res.data.accessToken, res.data.refreshToken);
         if (res.data.user) {
           useAuthStore.getState().setUser(res.data.user);
           if (res.data.user.id) {
-            localStorage.setItem('userId', res.data.user.id);
+            apiClient.setUserId(res.data.user.id);
           }
         }
         if (typeof window !== 'undefined') {
@@ -236,11 +236,11 @@ function AuthPageContent() {
       });
 
       if (res.success && res.data) {
-        apiClient.setAccessToken(res.data.accessToken);
+        apiClient.setAccessToken(res.data.accessToken, res.data.refreshToken);
         if (res.data.user) {
           useAuthStore.getState().setUser(res.data.user);
           if (res.data.user.id) {
-            localStorage.setItem('userId', res.data.user.id);
+            apiClient.setUserId(res.data.user.id);
           }
         }
         if (typeof window !== 'undefined') {
@@ -292,11 +292,11 @@ function AuthPageContent() {
           return;
         }
 
-        apiClient.setAccessToken(res.data.accessToken);
+        apiClient.setAccessToken(res.data.accessToken, res.data.refreshToken);
         if (res.data.user) {
           useAuthStore.getState().setUser(res.data.user);
           if (res.data.user.id) {
-            localStorage.setItem('userId', res.data.user.id);
+            apiClient.setUserId(res.data.user.id);
           }
         }
         if (typeof window !== 'undefined') {
@@ -362,7 +362,7 @@ function AuthPageContent() {
         }
 
         if (res.data) {
-          apiClient.setAccessToken(res.data.accessToken);
+          apiClient.setAccessToken(res.data.accessToken, res.data.refreshToken);
           if (typeof window !== 'undefined') {
             document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
             localStorage.setItem('lwsrh_has_user', 'true');
@@ -473,7 +473,7 @@ function AuthPageContent() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-y-auto bg-slate-50 flex items-start justify-center p-4 sm:p-6 font-outfit">
+    <div className="fixed inset-0 w-full overflow-y-auto overscroll-contain bg-slate-50 flex items-start justify-center p-4 sm:p-6 font-outfit">
       {/* Background Soft Glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl" />
