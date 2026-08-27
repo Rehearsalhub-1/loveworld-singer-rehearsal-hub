@@ -473,7 +473,7 @@ function AuthPageContent() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 flex items-center justify-center p-4 sm:p-6 font-outfit">
+    <div className="min-h-screen w-full overflow-y-auto bg-slate-50 flex items-start justify-center p-4 sm:p-6 font-outfit">
       {/* Background Soft Glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-purple-200/40 rounded-full blur-3xl" />
@@ -481,7 +481,7 @@ function AuthPageContent() {
       </div>
 
       {/* Main Authentication Card */}
-      <div className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 sm:p-8 flex flex-col">
+      <div className="relative z-10 my-auto w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 sm:p-8 flex flex-col">
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-6">
           <div className="w-16 h-16 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center p-2 mb-3 shadow-xs">

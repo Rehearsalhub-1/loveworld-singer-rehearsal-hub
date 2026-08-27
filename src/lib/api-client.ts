@@ -220,7 +220,10 @@ async function request<T>(
       return { success: false, error: 'Session expired', data: null } as T;
     }
 
-    const json = await res.json();
+    const contentType = res.headers.get('content-type') || '';
+    const json = contentType.includes('application/json')
+      ? await res.json()
+      : { success: false, error: `Backend request failed (${res.status})` };
     if (method === 'GET' && json?.success !== false && json?.data !== undefined) {
       apiGetCache.set(path, json);
     }
