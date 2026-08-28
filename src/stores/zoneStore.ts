@@ -8,7 +8,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, subscribeWithSelector } from 'zustand/middleware'
 import { ZONES, Zone, isSuperAdmin, isHQGroup, getZoneByInvitationCode } from '@/config/zones'
-import { UserRole, hasPermission as checkPermission, isHQAdminEmail } from '@/config/roles'
+import { UserRole, hasPermission as checkPermission } from '@/config/roles'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from './authStore'
 
@@ -124,7 +124,7 @@ export const useZoneStore = create<ZoneState>()(
 
           try {
             const profile = useAuthStore.getState().profile
-            const isSuper = isSuperAdmin(email, userId) || isHQAdminEmail(email) || profile?.role === 'super_admin' || profile?.role === 'hq_admin' || profile?.hasHqAccess
+            const isSuper = profile?.role === 'super_admin' || profile?.role === 'boss' || isSuperAdmin(email, userId)
 
             if (isSuper) {
               const targetZone = savedZoneId
@@ -192,9 +192,24 @@ export const useZoneStore = create<ZoneState>()(
             )
 
             let role: UserRole = 'zone_member'
-            if (isHQAdminEmail(email) || profile?.role === 'hq_admin') {
+            const profileRole = String(profile?.role || '').toLowerCase()
+            const membershipRole = String(targetMembership?.role || '').toLowerCase()
+            if (profileRole === 'super_admin' || profileRole === 'boss') {
+              role = 'super_admin'
+            } else if (profileRole === 'hq_admin' || profile?.hasHqAccess === true || (profile as any)?.has_hq_access === true) {
               role = 'hq_admin'
-            } else if (targetMembership?.role === 'coordinator' || profile?.role === 'zone_coordinator') {
+            } else if (
+              profileRole === 'zone_coordinator' ||
+              profileRole === 'zone_admin' ||
+              profileRole === 'coordinator' ||
+              profileRole === 'church_coordinator' ||
+              profileRole === 'subgroup_admin' ||
+              profileRole === 'subgroup_coordinator' ||
+              membershipRole === 'coordinator' ||
+              membershipRole === 'admin' ||
+              membershipRole === 'zone_admin' ||
+              membershipRole === 'zone_coordinator'
+            ) {
               role = 'zone_coordinator'
             } else if (targetZone && isHQGroup(targetZone.id)) {
               role = 'hq_member'
@@ -254,9 +269,10 @@ export const useZoneStore = create<ZoneState>()(
             const membership = allMemberships.find((m: any) => m.zoneId === zone.id || m.hqGroupId === zone.id)
 
             let role: UserRole = 'zone_member'
-            if (isHQAdminEmail(uEmail) || authState.profile?.role === 'hq_admin' || authState.profile?.role === 'super_admin') {
+            const profRole = String(authState.profile?.role || '').toLowerCase()
+            if (profRole === 'hq_admin' || profRole === 'super_admin' || profRole === 'boss' || authState.profile?.hasHqAccess === true || (authState.profile as any)?.has_hq_access === true) {
               role = 'hq_admin'
-            } else if (membership?.role === 'coordinator' || authState.profile?.role === 'zone_coordinator') {
+            } else if (membership?.role === 'coordinator' || profRole === 'zone_coordinator' || profRole === 'zone_admin') {
               role = 'zone_coordinator'
             } else if (isHQGroup(zone.id)) {
               role = 'hq_member'

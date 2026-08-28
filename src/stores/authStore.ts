@@ -286,7 +286,12 @@ export const useAuthStore = create<AuthState>()(
     initialize: () => {
       const { isInitialized } = get()
       const hasJwt = typeof window !== 'undefined' && (
+        localStorage.getItem('jwt') ||
         sessionStorage.getItem('jwt') ||
+        localStorage.getItem('refreshToken') ||
+        sessionStorage.getItem('refreshToken') ||
+        localStorage.getItem('userId') ||
+        document.cookie.includes('lwsrh_jwt') ||
         document.cookie.includes('lwsrh_is_logged_in=true') ||
         localStorage.getItem('lwsrh_has_user') === 'true'
       );

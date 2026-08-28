@@ -36,19 +36,12 @@ export interface MasterProgram {
 export const MasterLibraryService = {
   getMasterSongs: async (): Promise<MasterSong[]> => {
     try {
-      const endpoints = ['/ministered_songs', '/ministered-songs', '/master', '/songs/master', '/songs/ministered'];
-      for (const ep of endpoints) {
-        try {
-          const res = await apiClient.get<{ success?: boolean; data?: MasterSong[] }>(ep);
-          if (res && Array.isArray(res.data) && res.data.length > 0) {
-            return res.data;
-          }
-          if (Array.isArray(res)) {
-            return res;
-          }
-        } catch {
-          // fallback
-        }
+      const res = await apiClient.get<{ success?: boolean; data?: MasterSong[] }>('/songs/master');
+      if (res && Array.isArray(res.data)) {
+        return res.data;
+      }
+      if (Array.isArray(res)) {
+        return res as MasterSong[];
       }
       return [];
     } catch (err) {

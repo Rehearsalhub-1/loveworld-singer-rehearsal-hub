@@ -317,19 +317,11 @@ export function isHQAdminEmail(email: string | null | undefined): boolean {
   return HQ_ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-// Helper to check if user should see admin button on home page
+// Helper function to check if user should see admin button on home page
 export function shouldShowAdminButton(
-  userEmail: string | null | undefined,
+  _userEmail: string | null | undefined,
   currentRole?: UserRole
 ): boolean {
-  if (!userEmail) return false;
-
-  // Show admin button for HQ admins
-  if (isHQAdminEmail(userEmail)) {
-    return true;
-  }
-
-  // Show admin button for other admin roles
   if (currentRole && (
     currentRole === 'super_admin' ||
     currentRole === 'boss' ||

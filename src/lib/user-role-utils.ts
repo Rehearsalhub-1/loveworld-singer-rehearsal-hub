@@ -1,48 +1,38 @@
 // User Role Utilities
-// Determines user permissions based on email prefix and zone context
+// Determines user permissions based on database profile fields and zone context
 
 import type { UserProfile } from '@/types/supabase'
-import { isHQAdminEmail } from '@/config/roles'
-
-// Boss emails that have full access to all features in all zones
-const BOSS_EMAILS = [
-  'takeshopstores@gmail.com'
-];
 
 /**
- * Check if user is a Boss or HQ Admin (has Boss/Admin status across all zones)
+ * Check if user is a Boss or Super Admin (has Boss/Admin status across all zones)
  */
 export function isBoss(user: UserProfile | null): boolean {
-  if (!user) return false
-
-  const email = user.email?.toLowerCase();
-
-  if ((user.role as string) === 'boss' || user.role === 'super_admin' || user.role === 'hq_admin') return true;
-
-  if (email?.startsWith('boss')) return true;
-
-  if (email && BOSS_EMAILS.includes(email)) return true;
-
-  if (email && isHQAdminEmail(email)) return true;
-
-  return false;
+  if (!user) return false;
+  const role = String(user.role || '').toLowerCase();
+  return role === 'boss' || role === 'super_admin' || user.hasHqAccess === true || (user as any).has_hq_access === true;
 }
 
 /**
- * Check if user is a Zone Leader (has ZNL prefix in email)
+ * Check if user is a Zone Leader / Coordinator
  */
 export function isZoneLeader(user: UserProfile | null): boolean {
-  if (!user?.email) return false
-
-  return user.email.toLowerCase().startsWith('znl')
+  if (!user) return false;
+  const role = String(user.role || '').toLowerCase();
+  const admin = String(user.administration || '').toLowerCase();
+  return (
+    role === 'zone_coordinator' ||
+    role === 'zone_admin' ||
+    role === 'coordinator' ||
+    admin === 'coordinator' ||
+    admin === 'zone leader'
+  );
 }
 
 /**
  * Check if user can see upgrade prompts
- * Only Zone Leaders (ZNL prefix) should see upgrade prompts
  */
 export function canSeeUpgradePrompts(user: UserProfile | null): boolean {
-  return isZoneLeader(user)
+  return isZoneLeader(user);
 }
 
 /**
@@ -50,40 +40,36 @@ export function canSeeUpgradePrompts(user: UserProfile | null): boolean {
  * Zone coordinators have administrative privileges within their zone
  */
 export function isZoneCoordinator(user: UserProfile | null): boolean {
-  if (!user) return false
-
-  return user.administration === 'Coordinator' || isZoneLeader(user)
+  return isZoneLeader(user);
 }
 
 /**
  * Check if user can manage zone subscription
- * Only zone coordinators and zone leaders can manage subscriptions
  */
 export function canManageZoneSubscription(user: UserProfile | null): boolean {
-  return isZoneCoordinator(user) || isZoneLeader(user)
+  return isZoneCoordinator(user) || isBoss(user);
 }
 
 /**
  * Get user display role for UI
  */
 export function getUserDisplayRole(user: UserProfile | null): string {
-  if (!user) return 'Guest'
+  if (!user) return 'Guest';
 
-  if (isBoss(user)) return 'Central Admin'
-  if (isZoneLeader(user)) return 'Zone Leader'
-  if (user.administration === 'Coordinator') return 'Zone Coordinator'
-  if (user.administration === 'Assistant Coordinator') return 'Assistant Coordinator'
-  if (user.administration) return user.administration
-  if (user.role === 'admin') return 'Admin'
+  if (isBoss(user)) return 'Central Admin';
+  if (isZoneLeader(user)) return 'Zone Coordinator';
+  if (user.administration === 'Assistant Coordinator') return 'Assistant Coordinator';
+  if (user.administration) return user.administration;
+  if (user.role === 'admin' || user.role === 'hq_admin') return 'HQ Admin';
 
-  return 'Member'
+  return 'Member';
 }
 
 /**
  * Check if user has elevated permissions in zone
  */
 export function hasZoneElevatedPermissions(user: UserProfile | null): boolean {
-  return isZoneLeader(user) || isZoneCoordinator(user)
+  return isZoneLeader(user) || isBoss(user);
 }
 
 /**
@@ -98,5 +84,5 @@ export function getUserPermissions(user: UserProfile | null) {
     canManageSubscription: canManageZoneSubscription(user),
     hasElevatedPermissions: hasZoneElevatedPermissions(user),
     displayRole: getUserDisplayRole(user)
-  }
+  };
 }

@@ -620,12 +620,7 @@ function AdminContent() {
       return
     }
 
-    // Blocklist - users who should never have admin access even if they're coordinators
-    const BLOCKED_ADMIN_EMAILS = [
-      'lliamzelvin@gmail.com'
-    ]
-
-    const isBlocked = Boolean(profile?.email && BLOCKED_ADMIN_EMAILS.includes(profile.email.toLowerCase()))
+    const isBlocked = Boolean((profile as any)?.status === 'banned' || (profile as any)?.is_banned === true);
 
     if (isBlocked) {
       router.push('/home')

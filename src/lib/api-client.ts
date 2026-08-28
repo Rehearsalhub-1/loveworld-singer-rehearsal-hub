@@ -23,14 +23,14 @@ function getAccessToken(): string | null {
 
 function setSessionCookies(accessToken: string): void {
   if (typeof document === 'undefined') return;
-  // Readable by Next middleware for route + role gates (not HttpOnly — access token also in sessionStorage).
-  document.cookie = `lwsrh_jwt=${accessToken}; path=/; max-age=${15 * 60}; SameSite=Strict`;
+  // Readable by Next middleware for route + role gates (persisted for 30 days)
+  document.cookie = `lwsrh_jwt=${accessToken}; path=/; max-age=2592000; SameSite=Lax`;
   document.cookie = 'lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax';
 }
 
 function clearSessionCookies(): void {
   if (typeof document === 'undefined') return;
-  document.cookie = 'lwsrh_jwt=; path=/; max-age=0; SameSite=Strict';
+  document.cookie = 'lwsrh_jwt=; path=/; max-age=0; SameSite=Lax';
   document.cookie = 'lwsrh_is_logged_in=; path=/; max-age=0; SameSite=Lax';
 }
 

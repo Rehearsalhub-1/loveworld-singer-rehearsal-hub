@@ -41,7 +41,6 @@ import { useSubscription } from '@/contexts/SubscriptionContext'
 import { useUnreadNotifications } from '@/stores/notificationStore'
 import { handleAppRefresh } from '@/utils/refresh-utils'
 
-import { isHQAdminEmail } from '@/config/roles'
 import HeroCarousel from './_components/HeroCarousel'
 import AboutSection from './_components/AboutSection'
 import FAQSection from './_components/FAQSection'
@@ -51,8 +50,8 @@ function HomePageContent() {
   const router = useRouter()
   const { signOut, profile, user, isLoading: authLoading, initialLoadComplete } = useAuth()
 
-  const isBoss = profile?.role === 'boss' || profile?.email?.toLowerCase().startsWith('boss')
-  const isHQAdmin = profile?.email && isHQAdminEmail(profile.email)
+  const isBoss = profile?.role === 'boss' || profile?.role === 'super_admin';
+  const isHQAdmin = profile?.role === 'hq_admin' || profile?.hasHqAccess === true || (profile as any)?.has_hq_access === true;
 
   const { currentZone, isLoading: zoneLoading, isZoneCoordinator, refreshZones } = useZone()
   const { hasFeature } = useSubscription()

@@ -15,8 +15,6 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { HQ_ADMIN_EMAILS } from '@/config/roles';
-
 import type { UserProfile } from '@/types/supabase';
 import { apiClient } from '@/lib/api-client';
 

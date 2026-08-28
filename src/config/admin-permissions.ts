@@ -5,6 +5,7 @@ export type AdminRole =
   | 'boss'
   | 'zone_admin'
   | 'zone_coordinator'
+  | 'coordinator'
   | 'subgroup_admin'
   | 'subgroup_coordinator'
   | 'church_coordinator'
@@ -67,7 +68,7 @@ export function getAdminPermissions(
 ): AdminPermissions {
   const role = String(roleValue || 'member').toLowerCase() as AdminRole
   const isHQ = hasHqAccess || role === 'super_admin' || role === 'admin' || role === 'hq_admin' || role === 'boss'
-  const canAccessAdmin = isHQ || role === 'zone_admin' || role === 'zone_coordinator' ||
+  const canAccessAdmin = isHQ || role === 'zone_admin' || role === 'zone_coordinator' || role === 'coordinator' ||
     role === 'subgroup_admin' || role === 'subgroup_coordinator' || role === 'church_coordinator'
 
   if (role === 'super_admin' || role === 'admin' || role === 'hq_admin') {
@@ -103,7 +104,17 @@ export function canPerformAdminAction(
   if (!permissions.canAccessAdmin || permissions.role === 'boss') return false
 
   if (action === 'editMemberDetails' || action === 'manageMemberFeatures') {
-    return permissions.role === 'super_admin' || permissions.role === 'admin' || permissions.role === 'hq_admin'
+    return (
+      permissions.role === 'super_admin' ||
+      permissions.role === 'admin' ||
+      permissions.role === 'hq_admin' ||
+      permissions.role === 'zone_admin' ||
+      permissions.role === 'zone_coordinator' ||
+      permissions.role === 'coordinator' ||
+      permissions.role === 'subgroup_admin' ||
+      permissions.role === 'subgroup_coordinator' ||
+      permissions.role === 'church_coordinator'
+    )
   }
 
   return false

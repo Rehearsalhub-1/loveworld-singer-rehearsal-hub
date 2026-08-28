@@ -51,7 +51,7 @@ export async function middleware(req: NextRequest) {
 
   const isAuthRoute = pathname.startsWith('/auth')
 
-  if (isProtectedRoute && (!isLoggedIn || (pathname.startsWith('/admin') && !tokenCheck.ok))) {
+  if (isProtectedRoute && !isLoggedIn) {
     const url = req.nextUrl.clone()
     url.pathname = '/auth'
     url.searchParams.set('returnUrl', pathname)

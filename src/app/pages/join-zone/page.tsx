@@ -11,7 +11,7 @@ import { ZONES, getZoneByInvitationCode } from '@/config/zones'
 export default function JoinZonePage() {
   const router = useRouter()
   const { user, profile } = useAuth()
-  const { refreshZones, userZones } = useZone()
+  const { refreshZones, userZones, joinZone } = useZone()
 
   const [zoneCode, setZoneCode] = useState('')
   const [zoneName, setZoneName] = useState<string | null>(null)
@@ -56,11 +56,10 @@ export default function JoinZonePage() {
     setError('')
 
     try {
-      const result = await Promise.resolve({ success: true, zoneName: zoneName || 'your zone' })
+      const result = await joinZone(zoneCode);
 
       if (result.success) {
-        const zName = result.zoneName || 'your zone'
-        setSuccess(`Welcome to ${zName}!`)
+        setSuccess(result.message || `Welcome to ${zoneName || 'your zone'}!`);
 
         localStorage.removeItem('lwsrh-zone-cache-v5')
         localStorage.removeItem('lwsrh-profile-cache-v1')

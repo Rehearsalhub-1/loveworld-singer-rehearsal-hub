@@ -21,32 +21,31 @@ export default function SplashPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  // KingsChat Mobile Redirect Flow
+  // KingsChat Mobile & Studio Redirect Flow
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const hash = window.location.hash
     const search = window.location.search
+    const combined = (search ? search.substring(1) : '') + '&' + (hash ? hash.substring(1) : '')
 
-    // Look for state=mobile-flow in search or hash
-    const hasMobileState = search.includes('state=mobile-flow') || hash.includes('state=mobile-flow')
-    
-    if (hasMobileState && (hash.includes('access_token=') || search.includes('access_token='))) {
-      // Parse parameters from both hash and search to ensure we catch them
-      const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash)
-      const searchParams = new URLSearchParams(search.startsWith('?') ? search.substring(1) : search)
-      
-      const accessToken = hashParams.get('access_token') || searchParams.get('access_token') || hashParams.get('accessToken')
-      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token') || hashParams.get('refreshToken')
-      const expiresIn = hashParams.get('expires_in') || searchParams.get('expires_in') || hashParams.get('expiresInMillis')
+    const searchParams = new URLSearchParams(search.startsWith('?') ? search.substring(1) : search)
+    const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash)
 
-      if (accessToken) {
-        // Construct the deep link to redirect back to the React Native app
-        const deepLinkUrl = `rehearsalhub://kingschat-callback?access_token=${accessToken}&refresh_token=${refreshToken || ''}&expires_in=${expiresIn || ''}`
-        
-        // Redirect the WebBrowser tab to trigger opening the mobile app
-        window.location.href = deepLinkUrl
-      }
+    const state = (searchParams.get('state') || hashParams.get('state') || '').toLowerCase()
+    const origin = (searchParams.get('origin') || hashParams.get('origin') || '').toLowerCase()
+
+    const isStudio = state.includes('studio') || state.includes('admin') || origin.includes('studio') || origin.includes('admin') || combined.includes('origin=studio') || combined.includes('state=studio')
+    const isMobileFlow = isStudio || state.includes('mobile') || origin.includes('mobile') || combined.includes('mobile-flow')
+
+    const accessToken = hashParams.get('access_token') || searchParams.get('access_token') || hashParams.get('accessToken') || searchParams.get('accessToken')
+    const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token') || hashParams.get('refreshToken') || searchParams.get('refreshToken')
+    const expiresIn = hashParams.get('expires_in') || searchParams.get('expires_in') || hashParams.get('expiresInMillis') || searchParams.get('expiresInMillis')
+
+    if (isMobileFlow && accessToken) {
+      const scheme = isStudio ? 'rehearsalhubadmin' : 'rehearsalhub'
+      const deepLinkUrl = `${scheme}://kingschat-callback?access_token=${accessToken}&refresh_token=${refreshToken || ''}&expires_in=${expiresIn || ''}`
+      window.location.href = deepLinkUrl
     }
   }, [pathname])
 
