@@ -1,4 +1,4 @@
-const BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://rehearsalhub-api-production-6a17.up.railway.app').replace(/\/+$/, '');
+const BASE_URL = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '').replace(/\/+$/, '');
 const REFRESH_COOKIE = 'lwsrh_refresh';
 function getDeviceId(): string {
   if (typeof window === 'undefined') return 'web-server';

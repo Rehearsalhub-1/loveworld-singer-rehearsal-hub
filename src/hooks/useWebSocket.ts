@@ -3,9 +3,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 function getWsUrl(): string {
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://rehearsalhub-api-production-6a17.up.railway.app';
-  if (backend) {
-    return backend.replace(/\/+$/, '').replace(/^http/, 'ws');
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/+$/, '').replace(/^http/, 'ws');
   }
   if (typeof window !== 'undefined') {
     const loc = window.location;
