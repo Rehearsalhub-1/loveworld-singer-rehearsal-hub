@@ -554,14 +554,7 @@ function PraiseNightPageContent() {
       }
     }
   }, [categoryFilter, currentZone, isZoneCoordinator, profile, userRole, isInitialized, isProfileLoading, router]);
-  useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      refreshData();
-    }, 60000); // Refresh every 60 seconds (reduced from 30s to save Firebase reads)
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [refreshData]);
+
   useEffect(() => {
     if (pageParam && allPraiseNights.length > 0) {
       const targetPage = allPraiseNights.find(page =>

@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useProgramStore } from '@/stores/programStore'
 import { PraiseNightSong } from '@/types/supabase'
-import { BackendAPI } from '@/lib/api-client'
-import { isHQGroup } from '@/config/zones'
+import { apiClient } from '@/lib/api-client'
 
 export interface HomeSearchResult {
   id: string
@@ -20,12 +19,12 @@ export interface HomeSearchResult {
 const features = [
   { title: 'Rehearsals', url: '/pages/rehearsals', icon: 'Calendar' },
   { title: 'Profile', url: '/pages/profile', icon: 'User' },
-  { title: 'Push Notifications', url: '#', icon: 'Bell' },
-  { title: 'Groups', url: '#', icon: 'Users' },
-  { title: 'Submit Song', url: '#', icon: 'Music' },
-  { title: 'Media', url: '#', icon: 'Play' },
-  { title: 'Ministry Calendar', url: '#', icon: 'Calendar' },
-  { title: 'Analytics', url: '#', icon: 'BarChart3' },
+  { title: 'Push Notifications', url: '/pages/notifications', icon: 'Bell' },
+  { title: 'Groups', url: '/pages/groups', icon: 'Users' },
+  { title: 'AudioLab', url: '/pages/audiolab', icon: 'Mic' },
+  { title: 'Submit Song', url: '/pages/submit-song', icon: 'Music' },
+  { title: 'Media', url: '/pages/media', icon: 'Play' },
+  { title: 'Ministry Calendar', url: '/pages/calendar', icon: 'Calendar' },
   { title: 'Customer Support', url: '/pages/support', icon: 'HelpCircle' }
 ]
 
@@ -52,9 +51,9 @@ export function useHomeGlobalSearch(zoneId?: string, enabled: boolean = false) {
 
     const loadAllSongs = async () => {
       try {
-        const collection = isHQGroup(zoneId) ? 'praise_night_songs' : 'zone_songs'
-        const res = await BackendAPI.generic.list(collection, 1000, 'zoneId', zoneId, '==')
-        setAllSongs((res.data as any[]) || [])
+        const res = await apiClient.get<any>('/songs?limit=500');
+        const list = Array.isArray(res.data) ? res.data : Array.isArray((res as any)?.songs) ? (res as any).songs : [];
+        setAllSongs(list)
         setSongsLoaded(true)
       } catch (error) {
         console.error('Error loading songs for search:', error)
@@ -74,13 +73,13 @@ export function useHomeGlobalSearch(zoneId?: string, enabled: boolean = false) {
     const results: HomeSearchResult[] = []
 
     pages.forEach((page: any) => {
-      if (page.name.toLowerCase().includes(query)) {
+      if (page.name && page.name.toLowerCase().includes(query)) {
         results.push({
           id: `page-${page.id}`,
           type: 'page',
           title: page.name,
           subtitle: 'Praise Night Event',
-          description: `${page.location} • ${page.date}`,
+          description: `${page.location || ''} ${page.date || ''}`.trim(),
           url: `/pages/praise-night?page=${page.id}`,
           pageId: page.id,
           icon: 'Calendar'
@@ -102,12 +101,12 @@ export function useHomeGlobalSearch(zoneId?: string, enabled: boolean = false) {
       if (matches) {
         const songPage = pages.find(p => p.id === song.praiseNightId)
         results.push({
-          id: `song-${song.title}-${songPage?.id || 'unknown'}`,
+          id: `song-${song.id || song.title}`,
           type: 'song',
           title: song.title,
           subtitle: 'Song',
-          description: `${songPage?.name || 'Unknown'} • ${song.category || ''}`,
-          url: `/pages/praise-night?page=${songPage?.id}&song=${encodeURIComponent(song.title)}`,
+          description: `${songPage?.name || 'Repertoire'} • ${song.category || ''}`,
+          url: `/pages/all-ministered-songs?search=${encodeURIComponent(song.title)}`,
           pageId: songPage?.id,
           category: song.category || '',
           status: song.status,
@@ -149,7 +148,6 @@ export function useHomeGlobalSearch(zoneId?: string, enabled: boolean = false) {
   return {
     searchQuery,
     setSearchQuery,
-    searchResults,
-    hasResults: searchResults.length > 0
+    searchResults
   }
 }

@@ -92,35 +92,29 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch directory members scoped by zone
-      const directoryQuery = isGlobalView
-        ? '/profiles/directory'
-        : `/profiles/directory?zone_code=${selectedZone?.invitationCode || selectedZoneId}`;
-      const dirRes = await apiClient.get<{ success: boolean; data: any[] }>(directoryQuery).catch(() => null);
+      // 1. Fetch directory members scoped by active tenant
+      const dirRes = await apiClient.get<{ success: boolean; data: any[] }>('/profiles/directory').catch(() => null);
       if (dirRes?.success !== false && Array.isArray(dirRes?.data)) {
         setMembers(dirRes.data);
       }
 
-      // 2. Fetch programs
-      const progQuery = isGlobalView ? '/programs' : `/programs?zoneId=${selectedZoneId}`;
-      const progRes = await apiClient.get<{ success: boolean; data: any[] }>(progQuery).catch(() => null);
+      // 2. Fetch programs scoped by active tenant
+      const progRes = await apiClient.get<{ success: boolean; data: any[] }>('/programs').catch(() => null);
       if (progRes?.success !== false && Array.isArray(progRes?.data)) {
         setTotalPraiseNights(progRes.data.length);
         setRecentPrograms(progRes.data.slice(0, 6));
       }
 
       // 3. Fetch pending song submissions
-      const subQuery = isGlobalView ? '/submitted-songs' : `/submitted-songs?zoneId=${selectedZoneId}`;
-      const subRes = await apiClient.get<{ success: boolean; data: any[] }>(subQuery).catch(() => null);
+      const subRes = await apiClient.get<{ success: boolean; data: any[] }>('/submitted-songs').catch(() => null);
       if (subRes?.success !== false && Array.isArray(subRes?.data)) {
         const pending = subRes.data.filter((s: any) => s.status === 'pending' || !s.status);
         setPendingSubmissions(pending.length);
       }
 
       // 4. Fetch songs count (both program repertoire & master library)
-      const songsQuery = isGlobalView ? '/songs/praise-night' : `/songs/praise-night?zoneId=${selectedZoneId}`;
       const [pnSongsRes, masterSongsRes] = await Promise.all([
-        apiClient.get<{ success: boolean; data: any[] }>(songsQuery).catch(() => null),
+        apiClient.get<{ success: boolean; data: any[] }>('/songs/praise-night').catch(() => null),
         apiClient.get<{ success: boolean; data: any[] }>('/songs/master').catch(() => null),
       ]);
       const pnCount = Array.isArray(pnSongsRes?.data) ? pnSongsRes.data.length : null;
@@ -138,7 +132,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
     } finally {
       setIsLoading(false);
     }
-  }, [isGlobalView, selectedZoneId, selectedZone, currentZone]);
+  }, [selectedZoneId, selectedZone, currentZone]);
 
   useEffect(() => {
     loadData();

@@ -18,7 +18,7 @@ export default function Navigation() {
     { href: '/pages/audiolab', label: 'AudioLab', icon: Mic },
     { href: '/pages/status', label: 'Status', icon: Radio },
     ...(capabilities.canManageOrganization || capabilities.canManagePlatform
-      ? [{ href: '/pages/admin', label: 'Admin', icon: Settings }]
+      ? [{ href: '/admin', label: 'Admin', icon: Settings }]
       : []),
   ]
 

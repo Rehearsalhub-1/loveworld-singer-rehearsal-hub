@@ -94,15 +94,19 @@ export function getMembershipCapabilities(
   }
 
   const rawRole = String(membership.role || '').toUpperCase();
-  const isOrgAdmin =
-    rawRole === 'ORGANIZATION_ADMIN' ||
-    rawRole === 'ORG_ADMIN' ||
+  const isHQAdmin =
+    isPlatformSuperAdmin ||
     rawRole === 'HQ_ADMIN' ||
-    rawRole === 'ZONE_ADMIN' ||
-    rawRole === 'ADMIN' ||
     rawRole === 'SUPER_ADMIN' ||
     rawRole === 'BOSS' ||
     membership.hasHqAccess === true;
+
+  const isOrgAdmin =
+    isHQAdmin ||
+    rawRole === 'ORGANIZATION_ADMIN' ||
+    rawRole === 'ORG_ADMIN' ||
+    rawRole === 'ZONE_ADMIN' ||
+    rawRole === 'ADMIN';
 
   const isSubgroupAdmin =
     isOrgAdmin ||
@@ -112,7 +116,7 @@ export function getMembershipCapabilities(
     rawRole === 'ZONE_COORDINATOR';
 
   return {
-    canManagePlatform: false,
+    canManagePlatform: isHQAdmin,
     canManageOrganization: isOrgAdmin,
     canManageSubgroup: isSubgroupAdmin,
     canManageMembers: isOrgAdmin || isSubgroupAdmin,

@@ -244,14 +244,14 @@ export default function OrganizationSwitcher() {
           <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-indigo-600' : ''}`} />
         </button>
 
-        {/* Optional Subgroup Dropdown */}
-        {accessibleSubgroups.length > 0 && (
+        {/* Subgroup Dropdown (Only when multiple subgroups or admin scope) */}
+        {(accessibleSubgroups.length > 1 || (capabilities.canManageOrganization && accessibleSubgroups.length > 0)) && (
           <select
             value={activeSubgroup?.id || ''}
             onChange={(e) => switchSubgroup(e.target.value || null)}
             className="text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-2 text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:bg-white cursor-pointer"
           >
-            <option value="">All Subgroups</option>
+            <option value="">All Churches</option>
             {accessibleSubgroups.map((sg) => (
               <option key={sg.id} value={sg.id}>
                 {sg.name}

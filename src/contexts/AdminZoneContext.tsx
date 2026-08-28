@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { ZONES, Zone } from '@/config/zones';
 import { useAuth } from '@/stores/authStore';
 import { useZone } from '@/stores/zoneStore';
+import { useOrganizationStore } from '@/stores/organizationStore';
 import { apiClient } from '@/lib/api-client';
 
 export interface ChurchSubGroup {
@@ -41,11 +42,21 @@ interface AdminZoneContextType {
 const AdminZoneContext = createContext<AdminZoneContextType | undefined>(undefined);
 
 export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
-  const { profile, user } = useAuth();
-  const { currentZone, isSuperAdmin, switchZone } = useZone();
+  const { profile } = useAuth();
+  const {
+    activeOrganization,
+    activeSubgroup,
+    accessibleOrganizations,
+    accessibleSubgroups,
+    switchOrganization,
+    switchSubgroup,
+    capabilities,
+    isSuperAdmin,
+  } = useOrganizationStore();
 
   const isHQAdmin = Boolean(
     isSuperAdmin ||
+    capabilities.canManagePlatform ||
     profile?.role === 'hq_admin' ||
     profile?.role === 'admin' ||
     profile?.role === 'boss' ||
@@ -53,141 +64,76 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
     (profile as any)?.has_hq_access
   );
 
-  const [selectedZoneId, setSelectedZoneIdState] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('admin_selected_zone_id') || localStorage.getItem('lwsrh_active_zone_id');
-      if (saved) return saved;
-    }
-    return currentZone?.id || (isHQAdmin ? 'all' : 'BLWZN1');
-  });
-
-  const [selectedChurchId, setSelectedChurchIdState] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlChurch = urlParams.get('churchId') || urlParams.get('subgroupId');
-      if (urlChurch) return urlChurch;
-      const saved = sessionStorage.getItem('admin_selected_church_id');
-      if (saved) return saved;
-    }
-    return null;
-  });
-
-  const [userChurches, setUserChurches] = useState<ChurchSubGroup[]>([]);
-  const [isLoadingChurches, setIsLoadingChurches] = useState(false);
-
-  // Fetch coordinated & member churches for the active admin/user
-  const refreshUserChurches = useCallback(async () => {
-    if (!user?.id) return;
-    setIsLoadingChurches(true);
-    try {
-      const [coordRes, mineRes] = await Promise.all([
-        apiClient.get<{ success: boolean; data: ChurchSubGroup[] }>('/subgroups/coordinated').catch(() => ({ data: [] })),
-        apiClient.get<{ success: boolean; data: ChurchSubGroup[] }>('/subgroups/mine').catch(() => ({ data: [] })),
-      ]);
-
-      const coord = Array.isArray(coordRes?.data) ? coordRes.data : [];
-      const mine = Array.isArray(mineRes?.data) ? mineRes.data : [];
-      const combined = [...coord, ...mine.filter((m) => !coord.some((c) => c.id === m.id))];
-      setUserChurches(combined);
-
-      // If URL specified scope=church or Church Admin without specific ID, auto-select first church
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search);
-        const scope = urlParams.get('scope');
-        const churchParam = urlParams.get('churchId') || urlParams.get('subgroupId');
-        if (!churchParam && scope === 'church' && combined.length > 0) {
-          setSelectedChurchIdState(combined[0].id);
-          sessionStorage.setItem('admin_selected_church_id', combined[0].id);
-        }
-      }
-    } catch (err) {
-      console.error('[AdminZoneProvider] Failed to load user churches:', err);
-    } finally {
-      setIsLoadingChurches(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    refreshUserChurches();
-  }, [refreshUserChurches]);
-
-  // Sync with currentZone when currentZone changes from user-facing or switcher
-  useEffect(() => {
-    if (currentZone?.id) {
-      setSelectedZoneIdState(currentZone.id);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('admin_selected_zone_id', currentZone.id);
-        localStorage.setItem('lwsrh_active_zone_id', currentZone.id);
-      }
-    }
-  }, [currentZone?.id]);
-
-  useEffect(() => {
-    apiClient.setActiveScope({
-      zoneId: selectedZoneId !== 'all' ? selectedZoneId : null,
-      churchId: selectedChurchId || null,
-      scope: selectedChurchId
-        ? 'church'
-        : (selectedZoneId !== 'all' ? 'zone' : 'global'),
-    });
-  }, [selectedZoneId, selectedChurchId]);
-
-  const setSelectedZoneId = (zoneId: string) => {
-    setSelectedZoneIdState(zoneId);
-    setSelectedChurchIdState(null); // Clear church scope when switching zones explicitly
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('admin_selected_zone_id', zoneId);
-      sessionStorage.removeItem('admin_selected_church_id');
-    }
-    // ── Update the API client scope store so all future requests carry the right headers
-    apiClient.setActiveScope({
-      zoneId: zoneId !== 'all' ? zoneId : null,
-      churchId: null,
-      scope: zoneId !== 'all' ? 'zone' : 'global',
-    });
-    if (zoneId !== 'all') {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('lwsrh_active_zone_id', zoneId);
-      }
-      switchZone(zoneId);
-    }
-  };
-
-  const setSelectedChurchId = (churchId: string | null) => {
-    setSelectedChurchIdState(churchId);
-    if (typeof window !== 'undefined') {
-      if (churchId) {
-        sessionStorage.setItem('admin_selected_church_id', churchId);
-      } else {
-        sessionStorage.removeItem('admin_selected_church_id');
-      }
-    }
-    // ── Update the API client scope store so all future requests carry the right headers
-    apiClient.setActiveScope({
-      zoneId: churchId ? (selectedZoneId !== 'all' ? selectedZoneId : null) : (selectedZoneId !== 'all' ? selectedZoneId : null),
-      churchId: churchId || null,
-      scope: churchId ? 'church' : (selectedZoneId !== 'all' ? 'zone' : 'global'),
-    });
-  };
+  const selectedZoneId = activeOrganization?.id || 'zone-001';
+  const selectedChurchId = activeSubgroup?.id || null;
+  const isGlobalView = Boolean(activeOrganization?.isHq);
+  const isChurchScope = Boolean(activeSubgroup?.id);
 
   const selectedZone = useMemo(() => {
-    if (selectedZoneId === 'all') return null;
-    return ZONES.find(z => z.id === selectedZoneId || z.invitationCode === selectedZoneId || z.slug === selectedZoneId) || currentZone || null;
-  }, [selectedZoneId, currentZone]);
+    if (!activeOrganization) return null;
+    return {
+      id: activeOrganization.id,
+      name: activeOrganization.name,
+      code: activeOrganization.code || activeOrganization.region || 'ORG',
+      region: activeOrganization.region || '',
+      themeColor: activeOrganization.themeColor || '#7c3aed',
+      isHQ: activeOrganization.isHq || false,
+    } as unknown as Zone;
+  }, [activeOrganization]);
 
   const selectedChurch = useMemo(() => {
-    if (!selectedChurchId) return null;
-    return userChurches.find(c => c.id === selectedChurchId) || null;
-  }, [selectedChurchId, userChurches]);
+    if (!activeSubgroup) return null;
+    return {
+      id: activeSubgroup.id,
+      name: activeSubgroup.name,
+      zoneId: activeSubgroup.organizationId || activeOrganization?.id,
+      description: activeSubgroup.description,
+    } as ChurchSubGroup;
+  }, [activeSubgroup, activeOrganization]);
 
-  const isChurchScope = Boolean(selectedChurchId && selectedChurchId !== 'all');
-  const isGlobalView = selectedZoneId === 'all' && !isChurchScope;
+  const availableZones = useMemo(() => {
+    return accessibleOrganizations.map((org) => ({
+      id: org.id,
+      name: org.name,
+      code: org.code || org.region || 'ORG',
+      region: org.region || '',
+      themeColor: org.themeColor || '#7c3aed',
+      isHQ: org.isHq || false,
+    })) as unknown as Zone[];
+  }, [accessibleOrganizations]);
+
+  const userChurches = useMemo(() => {
+    return accessibleSubgroups.map((sg) => ({
+      id: sg.id,
+      name: sg.name,
+      zoneId: sg.organizationId || activeOrganization?.id,
+      description: sg.description,
+    })) as ChurchSubGroup[];
+  }, [accessibleSubgroups, activeOrganization]);
+
+  const setSelectedZoneId = useCallback((zoneId: string) => {
+    if (zoneId === 'all') {
+      // If HQ admin selects all, default to primary HQ organization
+      const hqOrg = accessibleOrganizations.find((o) => o.isHq) || accessibleOrganizations[0];
+      if (hqOrg) switchOrganization(hqOrg.id);
+    } else {
+      switchOrganization(zoneId);
+    }
+  }, [accessibleOrganizations, switchOrganization]);
+
+  const setSelectedChurchId = useCallback((churchId: string | null) => {
+    switchSubgroup(churchId);
+  }, [switchSubgroup]);
+
+  const refreshUserChurches = useCallback(async () => {
+    useOrganizationStore.getState().refreshOrganizations();
+  }, []);
 
   const zoneScopeLabel = isChurchScope
-    ? (selectedChurch?.name ? `Church: ${selectedChurch.name}` : 'Church Admin Scope')
+    ? (selectedChurch?.name || 'Church Scope')
     : isGlobalView
-    ? 'All Zones (Global HQ)'
-    : (selectedZone?.name || 'Selected Zone');
+      ? (activeOrganization?.name || 'Global HQ')
+      : (activeOrganization?.name || 'Zonal Scope');
 
   return (
     <AdminZoneContext.Provider
@@ -196,7 +142,7 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
         selectedZone,
         isGlobalView,
         setSelectedZoneId,
-        availableZones: ZONES,
+        availableZones,
         isHQAdmin,
         zoneScopeLabel,
         selectedChurchId,
@@ -204,7 +150,7 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
         isChurchScope,
         setSelectedChurchId,
         userChurches,
-        isLoadingChurches,
+        isLoadingChurches: false,
         refreshUserChurches,
       }}
     >

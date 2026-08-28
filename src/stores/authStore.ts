@@ -372,7 +372,14 @@ export const useAuthStore = create<AuthState>()(
 
           // Load Organization and Membership context
           const memberships = Array.isArray(apiUser.memberships) ? apiUser.memberships : [];
-          const isSuper = userProfile.role === 'super_admin' || userProfile.role === 'boss';
+          const isSuper = Boolean(
+            userProfile.role === 'super_admin' ||
+            userProfile.role === 'boss' ||
+            userProfile.role === 'hq_admin' ||
+            userProfile.role === 'admin' ||
+            userProfile.hasHqAccess === true ||
+            (userProfile as any)?.has_hq_access === true
+          );
           useOrganizationStore.getState().loadOrganizations(apiUser.id, memberships, apiUser.email, isSuper);
 
           if (typeof window !== 'undefined') {

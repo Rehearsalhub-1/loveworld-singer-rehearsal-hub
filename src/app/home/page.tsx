@@ -27,16 +27,18 @@ import {
   Mic, 
   Sparkles, 
   Crown, 
-  ArrowRight 
+  ArrowRight,
+  Radio
 } from 'lucide-react'
 
 import { getMenuItems } from '@/config/menuItems'
 import SharedDrawer from '@/components/SharedDrawer'
 import Tooltip from '@/components/Tooltip'
-import ZoneSwitcher from '@/components/ZoneSwitcher'
+import OrganizationSwitcher from '@/components/OrganizationSwitcher'
 import { useHomeGlobalSearch, HomeSearchResult } from '@/hooks/useHomeGlobalSearch'
 import { useAuth } from '@/hooks/useAuth'
 import { useZone } from '@/hooks/useZone'
+import { useOrganizationStore } from '@/stores/organizationStore'
 import { useSubscription } from '@/contexts/SubscriptionContext'
 import { useUnreadNotifications } from '@/stores/notificationStore'
 import { handleAppRefresh } from '@/utils/refresh-utils'
@@ -49,6 +51,7 @@ import CelebrationOverlay from './_components/CelebrationOverlay'
 function HomePageContent() {
   const router = useRouter()
   const { signOut, profile, user, isLoading: authLoading, initialLoadComplete } = useAuth()
+  const { activeOrganization, capabilities, isSuperAdmin } = useOrganizationStore()
 
   const isBoss = profile?.role === 'boss' || profile?.role === 'super_admin';
   const isHQAdmin = profile?.role === 'hq_admin' || profile?.hasHqAccess === true || (profile as any)?.has_hq_access === true;
@@ -71,43 +74,18 @@ function HomePageContent() {
     }
   }, [searchParams])
 
-  const [retryCount, setRetryCount] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
-
-  useEffect(() => {
-    if (!zoneLoading && !currentZone && user && initialLoadComplete && retryCount < 2) {
-      const retryTimer = setTimeout(() => {
-        setRetryCount(prev => prev + 1);
-        if (refreshZones) {
-          refreshZones();
-        }
-      }, 1500);
-      return () => clearTimeout(retryTimer);
-    }
-  }, [zoneLoading, currentZone, user, initialLoadComplete, retryCount, refreshZones]);
-
-  const handleRetryZoneLoad = async () => {
-    setIsRetrying(true);
-    setRetryCount(0);
-    if (refreshZones) {
-      await refreshZones();
-    }
-    setTimeout(() => {
-      setIsRetrying(false);
-    }, 2000);
-  };
-
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [isCoordinator, setIsCoordinator] = useState(false)
 
-  const { searchQuery: globalSearchQuery, setSearchQuery: setGlobalSearchQuery, searchResults } = useHomeGlobalSearch(currentZone?.id, isSearchOpen)
+  const effectiveOrgId = activeOrganization?.id || currentZone?.id;
+  const { searchQuery: globalSearchQuery, setSearchQuery: setGlobalSearchQuery, searchResults } = useHomeGlobalSearch(effectiveOrgId, isSearchOpen)
   const typedSearchResults = searchResults as HomeSearchResult[]
 
   useEffect(() => {
-    setIsCoordinator(isZoneCoordinator);
-  }, [isZoneCoordinator]);
+    setIsCoordinator(isZoneCoordinator || capabilities.canManageOrganization || capabilities.canManageSubgroup);
+  }, [isZoneCoordinator, capabilities]);
 
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
@@ -171,40 +149,35 @@ function HomePageContent() {
     return tooltips[title] || ''
   }
 
-  const bossFeatures = [
-    {
-      icon: Shield,
-      title: 'Central Dashboard',
-      href: '/boss',
-      badge: null,
-      premium: false,
-      bossOnly: true,
-    },
-  ]
-
-  const coordinatorFeatures = [
-    {
-      icon: Shield,
-      title: 'Dashboard',
-      href: '/admin',
-      badge: null,
-      premium: false,
-      coordinatorOnly: true,
-    },
-  ]
-
   const hiddenFeatures = (profile as any)?.hidden_features || (profile as any)?.hiddenFeatures || {};
 
+  const isGlobalHQAdmin = Boolean(
+    isSuperAdmin ||
+    capabilities.canManagePlatform ||
+    isHQAdmin ||
+    profile?.role === 'hq_admin' ||
+    profile?.hasHqAccess ||
+    (profile as any)?.has_hq_access
+  );
+
+  const isZoneAdmin = Boolean(capabilities.canManageOrganization && !isGlobalHQAdmin);
+  const orgThemeColor = activeOrganization?.themeColor || currentZone?.themeColor || '#7C3AED';
+
   const features = [
-    ...(isBoss ? bossFeatures : []),
-    ...(isHQAdmin ? [{
+    ...(isGlobalHQAdmin ? [{
       icon: Shield,
       title: 'HQ Admin',
       href: '/admin',
       badge: null,
       premium: false,
     }] : []),
-    ...(isZoneCoordinator && !isBoss && !isHQAdmin ? coordinatorFeatures : []),
+    ...(isZoneAdmin ? [{
+      icon: Shield,
+      title: 'Admin Console',
+      href: '/admin',
+      badge: null,
+      premium: false,
+    }] : []),
     {
       icon: Calendar,
       title: 'Rehearsals',
@@ -226,6 +199,13 @@ function HomePageContent() {
       badge: true,
       premium: false,
     },
+    ...(!hiddenFeatures.hideAudioLab ? [{
+      icon: Mic,
+      title: 'AudioLab',
+      href: '/pages/audiolab',
+      badge: null,
+      premium: true,
+    }] : []),
     ...(!hiddenFeatures.hideSubgroups ? [{
       icon: Users,
       title: 'Groups',
@@ -240,27 +220,19 @@ function HomePageContent() {
       badge: null,
       premium: true,
     }] : []),
-    ...(!hiddenFeatures.hideAudioLab ? [{
+    {
       icon: Play,
       title: 'Media',
       href: '/pages/media',
       badge: 'media',
       premium: false,
-    }] : []),
+    },
     {
       icon: Calendar,
       title: 'Ministry Calendar',
       href: '/pages/calendar',
       badge: 'calendar',
       premium: false,
-    },
-    {
-      icon: BarChart3,
-      title: 'Link',
-      href: '#',
-      badge: null,
-      premium: false,
-      external: true,
     },
     {
       icon: HelpCircle,
@@ -271,7 +243,7 @@ function HomePageContent() {
     },
   ]
 
-  if (zoneLoading && !currentZone) {
+  if (zoneLoading && !currentZone && !activeOrganization) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
         <CustomLoader message="Loading Rehearsal Hub..." />
@@ -279,15 +251,7 @@ function HomePageContent() {
     );
   }
 
-  if (!zoneLoading && !currentZone && user && initialLoadComplete) {
-    if (isRetrying || retryCount < 2) {
-      return (
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
-          <CustomLoader message="Connecting to your choir zone..." />
-        </div>
-      );
-    }
-
+  if (!zoneLoading && !currentZone && !activeOrganization && user && initialLoadComplete) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-slate-50 p-4">
         <div className="text-center max-w-md">
@@ -298,25 +262,17 @@ function HomePageContent() {
           <p className="text-gray-500 text-sm mb-5">Check your connection and try again</p>
 
           <button
-            onClick={handleRetryZoneLoad}
-            disabled={isRetrying}
-            className="w-full mb-3 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-medium rounded-xl transition-colors"
+            onClick={() => refreshZones?.()}
+            className="w-full mb-3 inline-flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors"
           >
-            {isRetrying ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Retrying...
-              </>
-            ) : (
-              'Retry'
-            )}
+            Retry Connection
           </button>
 
           <Link
             href="/pages/join-zone"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-2.5 text-purple-600 font-medium rounded-xl hover:bg-purple-50 transition-colors"
           >
-            Join a Zone
+            Join an Organization / Zone
           </Link>
         </div>
       </div>
@@ -364,8 +320,8 @@ function HomePageContent() {
                       </div>
                     </Link>
 
-                    {/* Zone Switcher */}
-                    {!zoneLoading && currentZone && <div data-tour="zone-switcher"><ZoneSwitcher /></div>}
+                    {/* Organization Switcher */}
+                    <div data-tour="zone-switcher"><OrganizationSwitcher /></div>
                   </div>
 
                   {/* Right Section with iOS-style spacing */}
@@ -576,21 +532,21 @@ function HomePageContent() {
                           className="group flex flex-col items-center p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 active:scale-[0.97] border-0 hover:bg-white/90 ring-1 ring-black/5"
                         >
                           <div className="relative mb-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 shadow-sm ${isPremiumFeature && !hasAccess
-                              ? 'bg-gray-100 grayscale opacity-50'
-                              : ''
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${
+                                isPremiumFeature && !hasAccess ? 'bg-gray-100 grayscale opacity-50' : ''
                               }`}
                               style={
                                 isPremiumFeature && !hasAccess
                                   ? {}
                                   : {
-                                    background: `linear-gradient(to bottom right, ${currentZone?.themeColor || '#8B5CF6'}20, ${currentZone?.themeColor || '#8B5CF6'}40)`
-                                  }
+                                      background: `linear-gradient(135deg, ${orgThemeColor}20, ${orgThemeColor}38)`,
+                                    }
                               }
                             >
                               <feature.icon
-                                className="w-4 h-4 transition-colors duration-300"
-                                style={isPremiumFeature && !hasAccess ? { color: '#64748b' } : { color: currentZone?.themeColor || '#8B5CF6' }}
+                                className="w-4.5 h-4.5 transition-colors duration-300"
+                                style={isPremiumFeature && !hasAccess ? { color: '#64748b' } : { color: orgThemeColor }}
                               />
                             </div>
                             {feature.badge === true && hasUnreadNotifications && (

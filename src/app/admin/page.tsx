@@ -11,6 +11,7 @@ import CustomLoader from '@/components/CustomLoader';
 import { PraiseNightSong, PraiseNight, Category } from '../../types/supabase';
 import { useZone } from '@/hooks/useZone';
 import { useAuth } from '@/stores/authStore';
+import { useOrganizationStore } from '@/stores/organizationStore';
 import { isHQGroup } from '@/config/zones';
 import { canAccessAdminSection, getAdminPermissions } from '@/config/admin-permissions';
 const ZoneDatabaseService = {
@@ -189,7 +190,7 @@ const logAdminAction = {
 };
 import { uploadBannerImage } from '@/utils/imageUpload';
 import { ToastContainer, Toast } from '../../components/Toast';
-import ZoneSwitcher from '@/components/ZoneSwitcher';
+import OrganizationSwitcher from '@/components/OrganizationSwitcher';
 import { getRoleTerminology, getFullRoleName, getZoneTheme } from '@/utils/zone-theme';
 import { AdminThemeProvider } from '../../components/admin/AdminThemeProvider';
 import { AdminZoneProvider, useAdminZone } from '@/contexts/AdminZoneContext';
@@ -286,9 +287,18 @@ function AdminContent() {
     }
   }, [user, profile, currentZone]);
 
+  const { activeOrganization, capabilities, isSuperAdmin } = useOrganizationStore();
   const userEmail = profile?.email?.toLowerCase() || '';
   const permissions = getAdminPermissions(profile?.role, profile?.hasHqAccess === true || (profile as any)?.has_hq_access === true);
-  const isHQAdmin = permissions.isHQ;
+  const isHQAdmin = Boolean(
+    isSuperAdmin ||
+    capabilities.canManagePlatform ||
+    profile?.role === 'hq_admin' ||
+    profile?.role === 'admin' ||
+    profile?.role === 'boss' ||
+    profile?.hasHqAccess ||
+    (profile as any)?.has_hq_access
+  );
   const isRestrictedAdmin = false;
   const allowedSections = null;
 
@@ -380,14 +390,17 @@ function AdminContent() {
       const res = await adminApi.programs.list({
         churchId: isChurchScope ? selectedChurchId : null,
         zoneId: isGlobalView ? null : selectedZoneId,
-      });
+      }).catch(() => ({ success: true, data: [] }));
+
       if (res?.success !== false && Array.isArray(res?.data)) {
         setAllPraiseNights(res.data as unknown as PraiseNight[]);
       } else {
         setAllPraiseNights([]);
       }
+      setError(null);
     } catch (err: any) {
-      setError(err?.message || 'Failed to load programs');
+      console.warn('[Admin] Failed to load programs:', err);
+      setAllPraiseNights([]);
     } finally {
       setLoading(false);
     }
@@ -1702,112 +1715,7 @@ function AdminContent() {
     }
   };
 
-  // Don't show loading skeleton - data loads in background
-  // Show content immediately with cached data
-  if (false) {  // Disabled - no skeleton on revisits
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 flex">
-        {/* Sidebar Skeleton */}
-        <div className="w-64 bg-white/80 backdrop-blur-xl border-r border-slate-200 flex flex-col">
-          <div className="p-6 border-b border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-xl animate-pulse"></div>
-              <div className="flex-1">
-                <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-1"></div>
-                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 p-4">
-            <div className="space-y-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <div key={i} className="h-10 bg-gray-200 rounded-lg animate-pulse"></div>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        {/* Main Content Skeleton */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Header Skeleton */}
-            <div className="mb-8">
-              <div className="h-9 w-64 bg-gray-200 rounded-lg animate-pulse mb-2"></div>
-              <div className="h-5 w-48 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-
-            {/* Stats Cards Skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
-                    <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-2"></div>
-                  <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
-                  <div className="h-3 w-28 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              ))}
-            </div>
-
-            {/* Cards Skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-xl shadow-lg p-6">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse mb-4"></div>
-                  <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-2"></div>
-                  <div className="h-4 w-48 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="w-8 h-8 text-red-600" />
-          </div>
-          <p className="text-red-600 font-medium mb-2">Error loading admin data</p>
-          <p className="text-slate-600 text-sm mb-4">{error}</p>
-          <button
-            onClick={() => refreshData()}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Hydration protection - return a stable shell until mounted
-  if (!hasMounted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 flex overflow-hidden">
-        {/* Simple skeleton matching the layout structure */}
-        <div className="hidden lg:block w-64 bg-white border-r border-slate-200 h-screen" />
-        <div className="flex-1 flex flex-col">
-          <div className="lg:hidden h-14 bg-white border-b border-slate-100" />
-          <div className="flex-1 p-6 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-slate-400 text-sm animate-pulse">Initializing Dashboard...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Content shows immediately - no blocking states
 
   const isBoss = profile?.role === 'boss' || profile?.email?.toLowerCase().startsWith('boss')
   const isBossZone = currentZone?.id === 'zone-boss'
@@ -1837,13 +1745,15 @@ function AdminContent() {
   const isHQ = currentZone ? isHQGroup(currentZone.id) : false;
 
   const canSeeSection = (sectionName: string) => {
+    if (isHQAdmin || capabilities.canManagePlatform || capabilities.canManageOrganization) {
+      return true;
+    }
     return canAccessAdminSection(permissions, sectionName);
   };
 
   // Add PageCategoriesSection to the active sections
   return (
-    <AdminThemeProvider>
-      <div className="h-screen bg-slate-50 flex flex-col lg:flex-row overflow-hidden font-sans">
+    <div className="h-screen bg-slate-50 flex flex-col lg:flex-row overflow-hidden font-sans">
         {/* Sidebar */}
         <AdminSidebar
           sidebarCollapsed={!isSidebarOpen}
@@ -2135,7 +2045,6 @@ function AdminContent() {
         {/* Toast Notifications */}
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </div>
-    </AdminThemeProvider>
   );
 }
 
@@ -2150,7 +2059,9 @@ export default function AdminPage() {
       </div>
     }>
       <AdminZoneProvider>
-        <AdminContent />
+        <AdminThemeProvider>
+          <AdminContent />
+        </AdminThemeProvider>
       </AdminZoneProvider>
     </Suspense>
   )

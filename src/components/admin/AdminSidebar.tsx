@@ -77,7 +77,7 @@ const AdminSidebar = React.memo(({
   const managementItems = [
     { icon: Users, label: 'Members', active: activeSection === 'Members' },
     { icon: CalendarCheck, label: 'Attendance', active: activeSection === 'Attendance' },
-    { icon: User, label: 'Sub-Groups', active: activeSection === 'Sub-Groups' || activeSection === 'Churches', badge: pendingSubGroupCount },
+    { icon: Building2, label: 'Sub-Groups', active: activeSection === 'Sub-Groups' || activeSection === 'Churches', badge: pendingSubGroupCount },
     { icon: Music, label: 'Media', active: activeSection === 'Media' },
     { icon: Mic, label: 'Playback Mode', active: activeSection === 'Playback Mode' || activeSection === 'Karaoke Config' },
     { icon: Calendar, label: 'Calendar', active: activeSection === 'Calendar' },

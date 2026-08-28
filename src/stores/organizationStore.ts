@@ -211,7 +211,18 @@ export const useOrganizationStore = create<OrganizationState>()(
           memberships.find((m) => m.organizationId === targetOrg.id) || null;
 
         const capabilities = getMembershipCapabilities(activeMembership, isSuper);
-        const accessibleSubgroups = targetOrg.subgroups || [];
+        
+        // Scope subgroups: Org/Platform admins see all subgroups; standard members only see their assigned church subgroups
+        const allOrgSubgroups = targetOrg.subgroups || [];
+        const isOrgAdmin = capabilities.canManageOrganization || capabilities.canManagePlatform || isSuper;
+        const userSubgroupIds = new Set(
+          memberships
+            .filter((m) => m.organizationId === targetOrg.id && m.subgroupId)
+            .map((m) => m.subgroupId!)
+        );
+        const accessibleSubgroups = isOrgAdmin
+          ? allOrgSubgroups
+          : allOrgSubgroups.filter((sg) => userSubgroupIds.has(sg.id));
 
         setStoredOrgId(userId, targetOrg.id);
         apiClient.setActiveScope({
@@ -254,7 +265,17 @@ export const useOrganizationStore = create<OrganizationState>()(
       const activeMembership =
         userMemberships.find((m) => m.organizationId === targetOrg.id) || null;
       const capabilities = getMembershipCapabilities(activeMembership, isSuperAdmin);
-      const accessibleSubgroups = targetOrg.subgroups || [];
+      
+      const allOrgSubgroups = targetOrg.subgroups || [];
+      const isOrgAdmin = capabilities.canManageOrganization || capabilities.canManagePlatform || isSuperAdmin;
+      const userSubgroupIds = new Set(
+        userMemberships
+          .filter((m) => m.organizationId === targetOrg.id && m.subgroupId)
+          .map((m) => m.subgroupId!)
+      );
+      const accessibleSubgroups = isOrgAdmin
+        ? allOrgSubgroups
+        : allOrgSubgroups.filter((sg) => userSubgroupIds.has(sg.id));
 
       setStoredOrgId(_lastLoadedUserId, targetOrg.id);
       apiClient.setActiveScope({
