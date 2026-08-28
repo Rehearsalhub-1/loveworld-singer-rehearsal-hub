@@ -66,23 +66,26 @@ export const SongDetailHeader: React.FC<SongDetailHeaderProps> = ({
               </h1>
               <div className="text-white text-sm space-y-1 font-poppins">
                 <div className="border-b border-white/30 pb-1">
-                  <span className="font-semibold uppercase">LEAD SINGER:</span> {displayedSongData?.leadSinger ? displayedSongData.leadSinger.split(',')[0].trim() : 'Unknown'}
+                  <span className="font-semibold uppercase">LEAD SINGER:</span> {((displayedSongData as any)?.leadSinger || (displayedSongData as any)?.lead_singer || (displayedSongData as any)?.singer || (displayedSongData as any)?.writer || 'Loveworld Singers').split(',')[0].trim()}
                 </div>
                 <div className="flex justify-between items-center border-b border-white/30 pb-1 mb-1">
-                  <span><span className="font-semibold uppercase">WRITER:</span> {displayedSongData?.writer || ''}</span>
+                  <span><span className="font-semibold uppercase">WRITER:</span> {(displayedSongData as any)?.writer || (displayedSongData as any)?.songWriter || ''}</span>
                   <span className="font-bold">x{displayedSongData?.rehearsalCount ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/30 pb-1 mb-1">
-                  <span><span className="font-semibold uppercase">CONDUCTOR:</span> {displayedSongData?.conductor || ''}</span>
+                  <span><span className="font-semibold uppercase">CONDUCTOR:</span> {(displayedSongData as any)?.conductor || (displayedSongData as any)?.conductorGuide || ''}</span>
                   <span><span className="font-semibold uppercase">KEY:</span> {displayedSongData?.key || ''}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/30 pb-1 mb-1">
-                  <span><span className="font-semibold uppercase">LEAD KEYBOARDIST:</span> {displayedSongData?.leadKeyboardist || ''}</span>
+                  <span><span className="font-semibold uppercase">LEAD KEYBOARDIST:</span> {(displayedSongData as any)?.leadKeyboardist || (displayedSongData as any)?.lead_keyboardist || ''}</span>
                   <span><span className="font-semibold uppercase">TEMPO:</span> {displayedSongData?.tempo || ''}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/30 pb-1 mb-1">
+                  <span><span className="font-semibold uppercase">LEAD GUITARIST:</span> {(displayedSongData as any)?.leadGuitarist || (displayedSongData as any)?.lead_guitarist || ''}</span>
                   <span><span className="font-semibold uppercase">DRUMMER:</span> {displayedSongData?.drummer || ''}</span>
-                  <span><span className="font-semibold uppercase">BASS GUITARIST:</span> {displayedSongData?.leadGuitarist || ''}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/30 pb-1 mb-1">
+                  <span><span className="font-semibold uppercase">BASS GUITARIST:</span> {(displayedSongData as any)?.bassGuitarist || (displayedSongData as any)?.bass_guitarist || ''}</span>
                 </div>
               </div>
             </div>

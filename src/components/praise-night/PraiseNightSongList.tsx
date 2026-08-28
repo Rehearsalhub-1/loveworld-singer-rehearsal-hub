@@ -119,7 +119,7 @@ export const PraiseNightSongList: React.FC<PraiseNightSongListProps> = ({
                       {song.title}
                     </h3>
                     <p className="text-xs lg:text-sm text-slate-500 mt-0.5 leading-tight font-bold">
-                      Singer: {song.leadSinger || 'Unknown'}
+                      Singer: {song.leadSinger || song.lead_singer || song.singer || song.writer || 'Loveworld Singers'}
                     </p>
                   </div>
                 </div>
