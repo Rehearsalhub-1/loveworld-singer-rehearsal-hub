@@ -109,34 +109,62 @@ async function refreshSession(): Promise<string> {
  * once when the scope changes, and every subsequent API request automatically carries the right headers.
  */
 interface ActiveScope {
-  zoneId: string | null;
-  churchId: string | null;
-  /** 'global' | 'zone' | 'church' */
+  organizationId?: string | null;
+  subgroupId?: string | null;
+  zoneId?: string | null;
+  churchId?: string | null;
+  /** 'global' | 'organization' | 'subgroup' | 'zone' | 'church' */
   scope: string;
 }
 
-let _activeScope: ActiveScope = { zoneId: null, churchId: null, scope: 'global' };
+let _activeScope: ActiveScope = { organizationId: null, subgroupId: null, zoneId: null, churchId: null, scope: 'global' };
 
-export function setActiveScope(scope: ActiveScope): void {
-  _activeScope = scope;
+export function setActiveScope(scope: Partial<ActiveScope> & { scope: string }): void {
+  const orgId = scope.organizationId ?? scope.zoneId ?? null;
+  const subId = scope.subgroupId ?? scope.churchId ?? null;
+
+  _activeScope = {
+    organizationId: orgId,
+    subgroupId: subId,
+    zoneId: orgId,
+    churchId: subId,
+    scope: scope.scope,
+  };
+
   // Also persist to localStorage so the scope survives page refreshes
   if (typeof window !== 'undefined') {
-    if (scope.zoneId) localStorage.setItem('lwsrh_active_zone_id', scope.zoneId);
-    else localStorage.removeItem('lwsrh_active_zone_id');
-    if (scope.churchId) localStorage.setItem('lwsrh_active_church_id', scope.churchId);
-    else localStorage.removeItem('lwsrh_active_church_id');
+    if (orgId) {
+      localStorage.setItem('lwsrh_active_organization_id', orgId);
+      localStorage.setItem('lwsrh_active_zone_id', orgId);
+    } else {
+      localStorage.removeItem('lwsrh_active_organization_id');
+      localStorage.removeItem('lwsrh_active_zone_id');
+    }
+    if (subId) {
+      localStorage.setItem('lwsrh_active_subgroup_id', subId);
+      localStorage.setItem('lwsrh_active_church_id', subId);
+    } else {
+      localStorage.removeItem('lwsrh_active_subgroup_id');
+      localStorage.removeItem('lwsrh_active_church_id');
+    }
     localStorage.setItem('lwsrh_active_scope', scope.scope);
   }
 }
 
 export function getActiveScope(): ActiveScope {
   // On first load, hydrate from localStorage (handles page refresh)
-  if (typeof window !== 'undefined' && _activeScope.scope === 'global' && !_activeScope.zoneId) {
-    const storedZoneId = localStorage.getItem('lwsrh_active_zone_id') || null;
-    const storedChurchId = localStorage.getItem('lwsrh_active_church_id') || null;
+  if (typeof window !== 'undefined' && _activeScope.scope === 'global' && !_activeScope.organizationId && !_activeScope.zoneId) {
+    const storedOrgId = localStorage.getItem('lwsrh_active_organization_id') || localStorage.getItem('lwsrh_active_zone_id') || null;
+    const storedSubId = localStorage.getItem('lwsrh_active_subgroup_id') || localStorage.getItem('lwsrh_active_church_id') || null;
     const storedScope = localStorage.getItem('lwsrh_active_scope') || 'global';
-    if (storedZoneId || storedChurchId) {
-      _activeScope = { zoneId: storedZoneId, churchId: storedChurchId, scope: storedScope };
+    if (storedOrgId || storedSubId) {
+      _activeScope = {
+        organizationId: storedOrgId,
+        subgroupId: storedSubId,
+        zoneId: storedOrgId,
+        churchId: storedSubId,
+        scope: storedScope,
+      };
     }
   }
   return _activeScope;
@@ -171,13 +199,17 @@ async function request<T>(
   // and automatically attach it as standard HTTP headers on every request.
   // NO screen component ever needs to manually build ?zoneId= or ?churchId= again.
   const scope = getActiveScope();
-  if (scope.zoneId) {
-    headers['x-zone-id'] = scope.zoneId;
-    headers['x-zone-code'] = scope.zoneId;
+  const orgId = scope.organizationId || scope.zoneId;
+  const subId = scope.subgroupId || scope.churchId;
+  if (orgId) {
+    headers['x-organization-id'] = orgId;
+    headers['x-selected-zone-id'] = orgId;
+    headers['x-zone-id'] = orgId;
+    headers['x-zone-code'] = orgId;
   }
-  if (scope.churchId) {
-    headers['x-church-id'] = scope.churchId;
-    headers['x-subgroup-id'] = scope.churchId;
+  if (subId) {
+    headers['x-subgroup-id'] = subId;
+    headers['x-church-id'] = subId;
   }
   if (scope.scope) {
     headers['x-scope'] = scope.scope;

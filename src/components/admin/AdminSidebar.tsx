@@ -28,9 +28,9 @@ import {
   CalendarCheck,
   Smartphone,
   MapPin,
+  Building2,
 } from "lucide-react";
-import { useZone } from '@/hooks/useZone';
-import { isHQGroup } from '@/config/zones';
+import { useOrganizationStore } from '@/stores/organizationStore';
 
 interface AdminSidebarProps {
   sidebarCollapsed: boolean;
@@ -48,30 +48,28 @@ const AdminSidebar = React.memo(({
   setSidebarCollapsed,
   activeSection,
   setActiveSection,
-  isHQAdmin = false,
   isRestrictedAdmin = false,
   allowedSections = null,
   pendingSubGroupCount = 0
 }: AdminSidebarProps) => {
   const router = useRouter();
-  const { currentZone } = useZone();
+  const { activeOrganization, capabilities, isSuperAdmin } = useOrganizationStore();
 
-  const themeColor = currentZone?.themeColor || '#9333ea';
-  const isHQ = currentZone ? isHQGroup(currentZone.id) : false;
-  const isZoneCoordinator = currentZone && !isHQ && !isHQAdmin;
+  const themeColor = activeOrganization?.themeColor || '#4f46e5';
 
   // Group sidebar items by category
   const mainItems = [
     { icon: Home, label: 'Dashboard', active: activeSection === 'Dashboard' },
-    { icon: BarChart3, label: 'Analytics', active: activeSection === 'Analytics', hqZoneOnly: true },
-    { icon: MessageCircle, label: 'Support Chat', active: activeSection === 'Support Chat', hqOnly: true, restrictedAdminHidden: true },
+    { icon: Building2, label: 'Organizations', active: activeSection === 'Organizations', platformOnly: true },
+    { icon: BarChart3, label: 'Analytics', active: activeSection === 'Analytics' },
+    { icon: MessageCircle, label: 'Support Chat', active: activeSection === 'Support Chat' },
   ];
 
   const contentItems = [
     { icon: FileText, label: 'Pages', active: activeSection === 'Pages' },
     { icon: Tag, label: 'Categories', active: activeSection === 'Categories' },
     { icon: FolderOpen, label: 'Page Categories', active: activeSection === 'Page Categories' },
-    { icon: Library, label: 'Master Library', active: activeSection === 'Master Library', hqOnly: true },
+    { icon: Library, label: 'Master Library', active: activeSection === 'Master Library' },
     { icon: Upload, label: 'Submitted Songs', active: activeSection === 'Submitted Songs' },
     { icon: List, label: 'Schedule Manager', active: activeSection === 'Schedule Manager' },
   ];
@@ -79,28 +77,26 @@ const AdminSidebar = React.memo(({
   const managementItems = [
     { icon: Users, label: 'Members', active: activeSection === 'Members' },
     { icon: CalendarCheck, label: 'Attendance', active: activeSection === 'Attendance' },
-    { icon: User, label: 'Churches', active: activeSection === 'Churches' || activeSection === 'Sub-Groups', badge: pendingSubGroupCount },
+    { icon: User, label: 'Sub-Groups', active: activeSection === 'Sub-Groups' || activeSection === 'Churches', badge: pendingSubGroupCount },
     { icon: Music, label: 'Media', active: activeSection === 'Media' },
-    { icon: Mic, label: 'Playback Mode', active: activeSection === 'Playback Mode' || activeSection === 'Karaoke Config', hqOnly: true },
-    { icon: Calendar, label: 'Calendar', active: activeSection === 'Calendar', hqOnly: true },
-    { icon: Bell, label: 'Notifications', active: activeSection === 'Notifications', hqOnly: true },
-    { icon: DollarSign, label: 'Payments', active: activeSection === 'Payments', hqOnly: true },
-    { icon: Activity, label: 'Activity Logs', active: activeSection === 'Activity Logs', hqOnly: true },
-    { icon: Smartphone, label: 'App Updates', active: activeSection === 'App Updates', hqOnly: true },
+    { icon: Mic, label: 'Playback Mode', active: activeSection === 'Playback Mode' || activeSection === 'Karaoke Config' },
+    { icon: Calendar, label: 'Calendar', active: activeSection === 'Calendar' },
+    { icon: Bell, label: 'Notifications', active: activeSection === 'Notifications' },
+    { icon: DollarSign, label: 'Payments', active: activeSection === 'Payments' },
+    { icon: Activity, label: 'Activity Logs', active: activeSection === 'Activity Logs' },
+    { icon: Smartphone, label: 'App Updates', active: activeSection === 'App Updates' },
     { icon: MapPin, label: 'Geofence Config', active: activeSection === 'Geofence Config' },
   ];
 
-  // Filter items based on role
+  // Filter items based on capabilities
   const filterItems = (items: any[]) => items.filter(item => {
+    if (item.platformOnly && !capabilities.canManagePlatform && !isSuperAdmin) return false;
     if (isRestrictedAdmin) {
       if (allowedSections) {
         return allowedSections.includes(item.label);
       }
       return item.label === 'Pages' || !item.restrictedAdminHidden;
     }
-    if (item.hqOnly && !isHQAdmin) return false;
-    if (item.hqZoneOnly && !isHQ) return false;
-    if (item.zoneOnly && !isZoneCoordinator) return false;
     return true;
   });
 
@@ -214,7 +210,7 @@ const AdminSidebar = React.memo(({
               </div>
               <div className={`${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                 <h1 className="text-sm font-black text-slate-900 tracking-tight leading-tight">Admin Console</h1>
-                <p className="text-[10px] font-bold text-indigo-600 truncate max-w-[130px] uppercase tracking-wider">{currentZone?.name || 'HQ Ministry'}</p>
+                <p className="text-[10px] font-bold text-indigo-600 truncate max-w-[130px] uppercase tracking-wider">{activeOrganization?.name || 'Organization'}</p>
               </div>
             </Link>
 

@@ -8,6 +8,7 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { apiClient, clearAccessToken, SessionExpiredError } from '@/lib/api-client'
+import { useOrganizationStore } from './organizationStore'
 import type { UserProfile } from '@/types/supabase'
 
 // ─── Profile Parser (matches rehearsalhubv2 useUser.tsx) ────────────────────
@@ -212,6 +213,7 @@ export const useAuthStore = create<AuthState>()(
 
         clearAccessToken()
         clearProfileCache()
+        useOrganizationStore.getState().clearOrganizationState()
 
         if (typeof window !== 'undefined') {
           const preservedKeys = [
@@ -318,11 +320,23 @@ export const useAuthStore = create<AuthState>()(
 
       set({ isInitialized: true });
 
-      // Fetch current user from API
-      apiClient.get<{ success: boolean; data?: { id: string; email: string; role: string; zoneId: string | null; firstName?: string; lastName?: string } }>('/auth/me')
+      // Fetch current user and memberships from API
+      apiClient.get<{
+        success: boolean;
+        data?: {
+          id: string;
+          email: string;
+          role: string;
+          zoneId: string | null;
+          firstName?: string;
+          lastName?: string;
+          memberships?: any[];
+        };
+      }>('/auth/me')
         .then(async (result) => {
           if (!result.success || !result.data) {
             clearProfileCache();
+            useOrganizationStore.getState().clearOrganizationState();
             set({ user: null, profile: null, loading: false, backendOffline: false });
             return;
           }
@@ -355,6 +369,11 @@ export const useAuthStore = create<AuthState>()(
           }
 
           set({ profile: userProfile, backendOffline: false });
+
+          // Load Organization and Membership context
+          const memberships = Array.isArray(apiUser.memberships) ? apiUser.memberships : [];
+          const isSuper = userProfile.role === 'super_admin' || userProfile.role === 'boss';
+          useOrganizationStore.getState().loadOrganizations(apiUser.id, memberships, apiUser.email, isSuper);
 
           if (typeof window !== 'undefined') {
             localStorage.setItem('lwsrh_has_user', 'true');

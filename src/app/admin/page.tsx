@@ -241,6 +241,7 @@ const KaraokeConfigSection = dynamic(() => import('../../components/admin/Karaok
 const AttendanceSection = dynamic(() => import('../../components/admin/AttendanceSection'), { ssr: false });
 const AppUpdatesSection = dynamic(() => import('../../components/admin/AppUpdatesSection'), { ssr: false });
 const GeofenceConfigSection = dynamic(() => import('../../components/admin/GeofenceConfigSection'), { ssr: false });
+const OrganizationsSection = dynamic(() => import('../../components/admin/OrganizationsSection'), { ssr: false });
 
 function AdminContent() {
   const router = useRouter();
@@ -1860,6 +1861,7 @@ function AdminContent() {
           {/* Active Admin Zone Context Header (Global vs Scoped Selector) */}
           <AdminZoneHeader activeSection={activeSection} />
 
+          {activeSection === 'Organizations' && <OrganizationsSection />}
           {activeSection === 'Dashboard' && canSeeSection('Dashboard') && <DashboardSection onSectionChange={setActiveSection} />}
           {activeSection === 'Analytics' && isHQAdmin && canSeeSection('Analytics') && <AnalyticsSection />}
           {activeSection === 'Payments' && isHQAdmin && canSeeSection('Payments') && <PaymentDashboardSection />}

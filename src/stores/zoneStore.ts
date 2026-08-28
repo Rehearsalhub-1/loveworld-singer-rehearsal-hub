@@ -126,66 +126,62 @@ export const useZoneStore = create<ZoneState>()(
             const profile = useAuthStore.getState().profile
             const isSuper = profile?.role === 'super_admin' || profile?.role === 'boss' || isSuperAdmin(email, userId)
 
+            // Dynamically fetch database organizations
+            const dbOrgsRes = await apiClient.get<{ success: boolean; data: any[] }>('/organizations')
+              .catch(() => apiClient.get<{ success: boolean; data: any[] }>('/zones').catch(() => ({ success: false, data: [] })));
+            const allDbOrgs: any[] = Array.isArray(dbOrgsRes?.data) ? dbOrgsRes.data : [];
+
             if (isSuper) {
-              const targetZone = savedZoneId
-                ? ZONES.find((z) => z.id === savedZoneId || z.invitationCode === savedZoneId) || ZONES[0]
-                : ZONES[0]
+              const targetZone = (savedZoneId ? allDbOrgs.find((z) => z.id === savedZoneId || z.invitationCode === savedZoneId) : null) || allDbOrgs[0] || null;
 
               set({
                 currentZone: targetZone,
-                userZones: ZONES,
+                userZones: allDbOrgs,
                 userRole: 'super_admin',
                 isSuperAdmin: true,
                 isLoading: false,
                 isInitialized: true,
                 _lastLoadedUserId: userId,
-              })
-              return
+              });
+              return;
             }
 
-            // Fetch zone memberships from /members/mine
-            const res = await apiClient.get<{ success: boolean; data?: { zoneMembers?: any[]; hqMembers?: any[] } }>('/members/mine')
-            let allMemberships: any[] = []
+            // Fetch zone memberships from /members/mine or /auth/me
+            const res = await apiClient.get<{ success: boolean; data?: { zoneMembers?: any[]; hqMembers?: any[]; memberships?: any[] } }>('/members/mine')
+              .catch(() => apiClient.get<{ success: boolean; data?: any }>('/auth/me').catch(() => ({ success: false, data: null })));
+            
+            let allMemberships: any[] = [];
             if (res.success && res.data) {
-              allMemberships = [
-                ...(res.data.zoneMembers || []),
-                ...(res.data.hqMembers || [])
-              ]
+              if (Array.isArray(res.data.memberships)) {
+                allMemberships = res.data.memberships;
+              } else {
+                allMemberships = [
+                  ...(res.data.zoneMembers || []),
+                  ...(res.data.hqMembers || [])
+                ];
+              }
             }
 
-            const zones: Zone[] = []
+            const zones: any[] = [];
             for (const mem of allMemberships) {
-              const zId = mem.zoneId || mem.hqGroupId
+              const zId = mem.organizationId || mem.zoneId || mem.hqGroupId;
               if (zId) {
-                const zoneConfig = ZONES.find(z => z.id === zId || z.invitationCode === zId || z.slug === zId)
-                if (zoneConfig && !zones.some(z => z.id === zoneConfig.id)) {
+                const dbOrg = allDbOrgs.find(z => z.id === zId || z.invitationCode === zId || z.code === zId);
+                const zoneObj = dbOrg || (mem.organization ? { ...mem.organization } : null);
+                if (zoneObj && !zones.some(z => z.id === zoneObj.id)) {
                   zones.push({
-                    ...zoneConfig,
+                    ...zoneObj,
                     membershipId: mem.id,
                     role: mem.role || 'member'
-                  } as Zone & { membershipId?: string; role?: string })
+                  });
                 }
               }
             }
 
-            // Also check profile's zone_code
-            const profileZoneCode = profile?.zoneCode || profile?.zone_code || profile?.zone || ''
-            if (profileZoneCode) {
-              const resolvedFromCode = getZoneByInvitationCode(profileZoneCode) || ZONES.find(z => z.id === profileZoneCode || z.invitationCode === profileZoneCode)
-              if (resolvedFromCode && !zones.some(z => z.id === resolvedFromCode.id)) {
-                zones.push(resolvedFromCode)
-              }
-            }
-
-            // Fallback: If no zone found, use BLWZN1 or first zone
-            if (zones.length === 0) {
-              const defaultZone = ZONES.find(z => z.invitationCode === 'BLWZN1' || z.id === 'zone1') || ZONES[0]
-              if (defaultZone) zones.push(defaultZone)
-            }
-
-            const targetZone = savedZoneId
-              ? zones.find((z) => z.id === savedZoneId || z.invitationCode === savedZoneId) || zones[0]
-              : zones[0]
+            // NO SILENT DEFAULT: If user has 0 memberships, resolve to null
+            const targetZone = (savedZoneId
+              ? zones.find((z) => z.id === savedZoneId || z.invitationCode === savedZoneId)
+              : null) || (zones.length > 0 ? zones[0] : null);
 
             const targetMembership = allMemberships.find(
               (m: any) => m.zoneId === targetZone?.id || m.hqGroupId === targetZone?.id

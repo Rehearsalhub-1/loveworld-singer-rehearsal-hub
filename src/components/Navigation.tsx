@@ -4,33 +4,40 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Music, Settings, Home, Menu, X, Mic, Radio } from 'lucide-react'
 import { useState } from 'react'
+import OrganizationSwitcher from './OrganizationSwitcher'
+import { useOrganizationStore } from '@/stores/organizationStore'
 
 export default function Navigation() {
   const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { capabilities } = useOrganizationStore()
 
   const navItems = [
     { href: '/home', label: 'Home', icon: Home },
     { href: '/pages/praise-night', label: 'Program', icon: Music },
     { href: '/pages/audiolab', label: 'AudioLab', icon: Mic },
     { href: '/pages/status', label: 'Status', icon: Radio },
-    { href: '/pages/admin', label: 'Admin', icon: Settings },
+    ...(capabilities.canManageOrganization || capabilities.canManagePlatform
+      ? [{ href: '/pages/admin', label: 'Admin', icon: Settings }]
+      : []),
   ]
 
   return (
     <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <div className="flex justify-between items-center h-16 sm:h-20">
-          <div className="flex items-center">
+        <div className="flex justify-between items-center h-16 sm:h-20 gap-4">
+          <div className="flex items-center gap-4">
             <Link href="/home" className="flex items-center gap-3 group transition-all">
               <div className="w-9 h-9 sm:w-11 sm:h-11 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition-transform duration-300">
                 <Music className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div className="hidden sm:block">
                 <span className="text-xl font-black text-slate-900 tracking-tight">LWSRHP</span>
-                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">Global Portal</p>
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">Rehearsal Hub</p>
               </div>
             </Link>
+
+            <OrganizationSwitcher />
           </div>
 
           <div className="hidden md:flex items-center space-x-2">
