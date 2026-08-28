@@ -1068,8 +1068,8 @@ function MemberManagementDrawer({
     currentProfile?.role || currentUser?.role,
     currentProfile?.hasHqAccess === true || (currentProfile as any)?.has_hq_access === true,
   );
-  const canEditMemberDetails = canPerformAdminAction(adminPermissions, 'editMemberDetails');
-  const canManageMemberFeatures = canPerformAdminAction(adminPermissions, 'manageMemberFeatures');
+  const canEditMemberDetails = adminPermissions.canAccessAdmin;
+  const canManageMemberFeatures = adminPermissions.canAccessAdmin;
 
   useEffect(() => {
     const raw = (member as any).rawData || {};
