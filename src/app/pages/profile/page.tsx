@@ -612,161 +612,60 @@ function ProfilePage() {
           </div>
         </div>
 
-        {/* My Zones Section */}
+        {/* Primary Zone Section */}
         <div className="px-4 mt-3">
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-            <button
-              onClick={() => toggleSection('zones')}
-              className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors active:bg-gray-100"
-            >
+            <div className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
                   <Users className="w-5 h-5 text-white" />
                 </div>
                 <div className="text-left">
                   <h3 className="text-xs font-bold text-gray-900">
-                    {isSuperAdmin || currentProfile?.role === 'hq_admin' || currentProfile?.hasHqAccess ? 'Zonal & HQ Access' : 'My Zones & Groups'}
+                    Primary Zone
                   </h3>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                    {isSuperAdmin || currentProfile?.role === 'hq_admin' || currentProfile?.hasHqAccess 
-                      ? 'HQ Global Admin' 
-                      : `${userZones.length} Membership${userZones.length !== 1 ? 's' : ''}`}
+                    {currentZone?.name || 'Assigned Zone'}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                {!(isSuperAdmin || currentProfile?.role === 'hq_admin' || currentProfile?.hasHqAccess) && (
-                  <Link
-                    href="/pages/join-zone"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors"
-                  >
-                    + JOIN
-                  </Link>
-                )}
-                <ChevronDown className={`w-4 h-4 text-gray-400 transform transition-transform duration-200 ${expandedSections.zones ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
+              {isSuperAdmin || currentProfile?.role === 'hq_admin' || currentProfile?.hasHqAccess ? (
+                <Link
+                  href="/admin"
+                  className="px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap"
+                >
+                  Admin Portal →
+                </Link>
+              ) : null}
+            </div>
 
-            <div className={`overflow-hidden transition-all duration-300 ${expandedSections.zones ? 'max-h-[2000px]' : 'max-h-0'}`}>
-              <div className="px-4 pb-4 space-y-2">
-                {isSuperAdmin || currentProfile?.role === 'hq_admin' || currentProfile?.hasHqAccess ? (
-                  <div className="space-y-3">
-                    <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 rounded-xl p-3.5 border border-purple-100 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-purple-600 rounded-xl flex items-center justify-center text-white shadow-md">
-                          <Crown className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="text-xs font-black text-purple-900 block">Global HQ Access Active</span>
-                          <p className="text-[10px] text-purple-700 font-medium">You have oversight of all 20+ zones across the ministry.</p>
-                        </div>
-                      </div>
-                      <Link
-                        href="/admin"
-                        className="px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap"
-                      >
-                        Admin Portal →
-                      </Link>
-                    </div>
-
-                    {currentZone && (
-                      <div className="p-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black shadow-sm"
-                            style={{ backgroundColor: currentZone.themeColor || '#9333ea' }}
-                          >
-                            {currentZone.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-gray-900">Current Scope: {currentZone.name}</p>
-                            <p className="text-[10px] text-gray-500 uppercase">{currentZone.region || 'HQ Assigned'}</p>
-                          </div>
-                        </div>
-                        <span className="text-[9px] bg-gray-900 text-white px-2.5 py-1 rounded-full font-black uppercase tracking-tighter flex items-center gap-1">
-                          <Check className="w-2.5 h-2.5" />
-                          PRIMARY
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : userZones.length > 0 ? (
-                  userZones.map((zone) => {
-                    const isActive = currentZone?.id === zone.id
-                    return (
-                      <div
-                        key={zone.id}
-                        className={`p-3 rounded-xl border transition-all ${
-                          isActive
-                            ? 'border-gray-300 bg-gray-50 ring-1 ring-gray-200'
-                            : 'border-gray-100 bg-white hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shadow-sm flex-shrink-0"
-                            style={{ backgroundColor: zone.themeColor || '#9333ea' }}
-                          >
-                            {zone.name.charAt(0)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-gray-900 truncate">{zone.name}</p>
-                            <p className="text-[10px] text-gray-500 font-medium uppercase">{zone.region || 'ZONAL REGION'}</p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {isActive ? (
-                              <span className="text-[9px] bg-gray-900 text-white px-2.5 py-1 rounded-full font-black uppercase tracking-tighter flex items-center gap-1">
-                                <Check className="w-2.5 h-2.5" />
-                                ACTIVE
-                              </span>
-                            ) : (
-                              <button
-                                onClick={async () => {
-                                  const success = await switchZone(zone.id)
-                                  if (success) {
-                                    setTimeout(() => window.location.reload(), 300)
-                                  }
-                                }}
-                                className="text-[9px] font-black uppercase tracking-tighter px-3 py-1 rounded-full border transition-all active:scale-95"
-                                style={{
-                                  color: zone.themeColor || '#9333ea',
-                                  borderColor: (zone.themeColor || '#9333ea') + '40',
-                                  backgroundColor: (zone.themeColor || '#9333ea') + '08'
-                                }}
-                              >
-                                Switch
-                              </button>
-                            )}
-                            <button
-                              onClick={() => {
-                                setZoneToLeave({ id: zone.id, name: zone.name })
-                                setShowLeaveZoneDialog(true)
-                              }}
-                              className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                              title={`Leave ${zone.name}`}
-                            >
-                              <LogOut className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-xs text-gray-500 font-medium">No zones joined yet</p>
-                    <Link
-                      href="/pages/join-zone"
-                      className="inline-flex items-center gap-2 mt-2 px-4 py-2 text-xs font-bold text-white rounded-xl shadow-md"
-                      style={{ backgroundColor: currentZone?.themeColor || '#9333ea' }}
+            <div className="px-4 pb-4">
+              {currentZone ? (
+                <div className="p-3.5 rounded-xl border border-purple-100 bg-purple-50/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shadow-sm flex-shrink-0"
+                      style={{ backgroundColor: currentZone.themeColor || '#9333ea' }}
                     >
-                      <Users className="w-3.5 h-3.5" />
-                      Join a Zone
-                    </Link>
+                      {currentZone.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">{currentZone.name}</p>
+                      <p className="text-[10px] text-purple-700 font-medium uppercase tracking-wider">
+                        {currentZone.region || 'Headquarters'}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
+                  <span className="text-[9px] bg-purple-600 text-white px-2.5 py-1 rounded-full font-black uppercase tracking-tighter flex items-center gap-1 shadow-sm">
+                    <Check className="w-2.5 h-2.5" />
+                    PRIMARY ZONE
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl border border-gray-100 bg-gray-50 text-center py-4">
+                  <p className="text-xs text-gray-500 font-medium">No primary zone assigned</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
