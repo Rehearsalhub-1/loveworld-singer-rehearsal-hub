@@ -41,7 +41,23 @@ function getRefreshToken(): string | null {
 
 function getUserId(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('userId') || sessionStorage.getItem('userId');
+  const stored = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+  if (stored) return stored;
+  const token = getAccessToken();
+  if (token) {
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')) || '{}');
+        const uid = payload.sub || payload.userId || payload.id;
+        if (uid) {
+          localStorage.setItem('userId', uid);
+          return uid;
+        }
+      }
+    } catch {}
+  }
+  return null;
 }
 
 function setRefreshToken(token: string): void {
@@ -61,6 +77,17 @@ function setAccessToken(token: string, refreshToken?: string): void {
   sessionStorage.setItem('jwt', token);
   localStorage.setItem('jwt', token);
   if (refreshToken) setRefreshToken(refreshToken);
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')) || '{}');
+      const uid = payload.sub || payload.userId || payload.id;
+      if (uid) {
+        localStorage.setItem('userId', uid);
+        sessionStorage.setItem('userId', uid);
+      }
+    }
+  } catch {}
   setSessionCookies(token);
 }
 
@@ -260,13 +287,18 @@ async function request<T>(
       apiGetCache.set(path, json);
     }
     return json as T;
-  } catch (netErr) {
+  } catch (netErr: any) {
     // If offline or connection dropped, return cached data if available
     if (method === 'GET' && apiGetCache.has(path)) {
       console.warn(`[apiClient] Network drop detected. Serving cached response for ${path}`);
       return apiGetCache.get(path) as T;
     }
-    throw netErr;
+    console.warn(`[apiClient] Request to ${path} failed:`, netErr?.message || netErr);
+    return {
+      success: false,
+      error: netErr?.message || 'Network request failed',
+      data: null,
+    } as T;
   }
 }
 
@@ -326,27 +358,31 @@ async function listCollection(
   operator = '==',
 ): Promise<ApiEnvelope<unknown[]>> {
   // Specialized member filters (avoid full-table scans)
-  if (collectionName === 'zone_members' && field && (field === 'userId' || field === 'user_id') && value != null) {
+  const cleanFilterVal = typeof value === 'object' && value !== null
+    ? ((value as any).id || (value as any).uid || (value as any).userId || '')
+    : String(value ?? '');
+
+  if (collectionName === 'zone_members' && field && (field === 'userId' || field === 'user_id') && cleanFilterVal) {
     const res = await apiClient.get<ApiEnvelope<{ zoneMembers?: unknown[]; hqMembers?: unknown[] }>>(
-      `/members/by-user/${encodeURIComponent(String(value))}`,
+      `/members/by-user/${encodeURIComponent(cleanFilterVal)}`,
     );
     return { success: true, data: (res.data?.zoneMembers ?? []) as unknown[] };
   }
-  if (collectionName === 'zone_members' && field && (field === 'zoneId' || field === 'zone_id') && value != null) {
+  if (collectionName === 'zone_members' && field && (field === 'zoneId' || field === 'zone_id') && cleanFilterVal) {
     const res = await apiClient.get<ApiEnvelope<unknown[]>>(
-      `/members/zone/${encodeURIComponent(String(value))}`,
+      `/members/zone/${encodeURIComponent(cleanFilterVal)}`,
     );
     return { success: true, data: asArray(res.data) };
   }
-  if (collectionName === 'hq_members' && field && (field === 'hqGroupId' || field === 'hq_group_id') && value != null) {
+  if (collectionName === 'hq_members' && field && (field === 'hqGroupId' || field === 'hq_group_id') && cleanFilterVal) {
     const res = await apiClient.get<ApiEnvelope<unknown[]>>(
-      `/members/hq/${encodeURIComponent(String(value))}?enrich=1`,
+      `/members/hq/${encodeURIComponent(cleanFilterVal)}?enrich=1`,
     );
     return { success: true, data: asArray(res.data) };
   }
-  if (collectionName === 'hq_members' && field && (field === 'userId' || field === 'user_id') && value != null) {
+  if (collectionName === 'hq_members' && field && (field === 'userId' || field === 'user_id') && cleanFilterVal) {
     const res = await apiClient.get<ApiEnvelope<{ zoneMembers?: unknown[]; hqMembers?: unknown[] }>>(
-      `/members/by-user/${encodeURIComponent(String(value))}`,
+      `/members/by-user/${encodeURIComponent(cleanFilterVal)}`,
     );
     return { success: true, data: (res.data?.hqMembers ?? []) as unknown[] };
   }
@@ -374,7 +410,7 @@ async function listCollection(
     user_favorites: '/favorites/me',
     playlists: '/playlists/me',
     user_playlists: '/playlists/me',
-    settings: '/settings/geofence_hq',
+    settings: '/settings', // Use getDocument('settings', keyId) for a specific key
   };
 
   const path = pathByCollection[collectionName];
@@ -409,31 +445,39 @@ async function listCollection(
   return { success: true, data: rows, count: rows.length };
 }
 
-async function getDocument(collectionName: string, docId: string): Promise<ApiEnvelope<unknown>> {
+async function getDocument(collectionName: string, docId: unknown): Promise<ApiEnvelope<unknown>> {
+  const cleanDocId = typeof docId === 'object' && docId !== null
+    ? ((docId as any).id || (docId as any).uid || (docId as any).userId || '')
+    : String(docId ?? '');
+
+  if (!cleanDocId || cleanDocId === '[object Object]') {
+    return { success: false, data: null };
+  }
+
   // Subscriptions keyed by user id
   if (collectionName === 'individual_subscriptions') {
     const res = await apiClient.get<ApiEnvelope<unknown>>(
-      `/subscriptions/${encodeURIComponent(docId)}`,
+      `/subscriptions/${encodeURIComponent(cleanDocId)}`,
     );
     return { success: res.success !== false, data: res.data };
   }
 
   const pathByCollection: Record<string, string> = {
-    profiles: `/profiles/${encodeURIComponent(docId)}`,
-    subgroups: `/subgroups/${encodeURIComponent(docId)}`,
-    praise_nights: `/praise-nights/${encodeURIComponent(docId)}`,
-    schedule: `/schedule/${encodeURIComponent(docId)}`,
-    schedule_programs: `/schedule/${encodeURIComponent(docId)}`,
-    zones: `/zones/${encodeURIComponent(docId)}`,
-    master_songs: `/songs/master/${encodeURIComponent(docId)}`,
-    praise_night_songs: `/songs/praise-night/${encodeURIComponent(docId)}`,
-    chats_v2: `/chats/${encodeURIComponent(docId)}`,
-    chats: `/chats/${encodeURIComponent(docId)}`,
-    settings: `/settings/${encodeURIComponent(docId)}`,
-    zone_songs: `/songs/zone/${encodeURIComponent(docId)}`,
-    subgroup_songs: `/songs/subgroup/${encodeURIComponent(docId)}`,
-    zone_praise_nights: `/songs/zone-praise-nights/${encodeURIComponent(docId)}`,
-    subgroup_praise_nights: `/songs/subgroup-praise-nights/${encodeURIComponent(docId)}`,
+    profiles: `/profiles/${encodeURIComponent(cleanDocId)}`,
+    subgroups: `/subgroups/${encodeURIComponent(cleanDocId)}`,
+    praise_nights: `/praise-nights/${encodeURIComponent(cleanDocId)}`,
+    schedule: `/schedule/${encodeURIComponent(cleanDocId)}`,
+    schedule_programs: `/schedule/${encodeURIComponent(cleanDocId)}`,
+    zones: `/zones/${encodeURIComponent(cleanDocId)}`,
+    master_songs: `/songs/master/${encodeURIComponent(cleanDocId)}`,
+    praise_night_songs: `/songs/praise-night/${encodeURIComponent(cleanDocId)}`,
+    chats_v2: `/chats/${encodeURIComponent(cleanDocId)}`,
+    chats: `/chats/${encodeURIComponent(cleanDocId)}`,
+    settings: `/settings/${encodeURIComponent(cleanDocId)}`,
+    zone_songs: `/songs/zone/${encodeURIComponent(cleanDocId)}`,
+    subgroup_songs: `/songs/subgroup/${encodeURIComponent(cleanDocId)}`,
+    zone_praise_nights: `/songs/zone-praise-nights/${encodeURIComponent(cleanDocId)}`,
+    subgroup_praise_nights: `/songs/subgroup-praise-nights/${encodeURIComponent(cleanDocId)}`,
   };
 
   const path = pathByCollection[collectionName];
@@ -549,8 +593,20 @@ export const BackendAPI = {
       return { success: false, error: `Update not available for ${collectionName}` };
     },
     delete: async (collectionName: string, id: string) => {
-      console.warn(`[BackendAPI] delete(${collectionName}, ${id}) not mapped`);
-      return { success: false, error: `Delete not available for ${collectionName}` };
+      const deleteRoutes: Record<string, string> = {
+        playlists: '/playlists',
+        chats: '/chats',
+        chats_v2: '/chats',
+        programs: '/programs',
+        praise_nights: '/programs',
+        submitted_songs: '/submitted-songs',
+      };
+      const base = deleteRoutes[collectionName];
+      if (!base) {
+        console.warn(`[BackendAPI] delete(${collectionName}, ${id}) not mapped`);
+        return { success: false, error: `Delete not supported for ${collectionName}` };
+      }
+      return apiClient.delete<ApiEnvelope>(`${base}/${encodeURIComponent(id)}`);
     },
   },
 

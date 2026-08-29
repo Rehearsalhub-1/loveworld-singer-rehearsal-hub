@@ -65,29 +65,39 @@ export interface AdminPermissions {
 export function getAdminPermissions(
   roleValue: unknown,
   hasHqAccess = false,
+  hiddenFeatures?: Record<string, boolean>,
 ): AdminPermissions {
   const role = String(roleValue || 'member').toLowerCase() as AdminRole
   const isHQ = hasHqAccess || role === 'super_admin' || role === 'admin' || role === 'hq_admin' || role === 'boss'
   const canAccessAdmin = isHQ || role === 'zone_admin' || role === 'zone_coordinator' || role === 'coordinator' ||
     role === 'subgroup_admin' || role === 'subgroup_coordinator' || role === 'church_coordinator'
 
-  if (role === 'super_admin' || role === 'admin' || role === 'hq_admin') {
-    return { role, isHQ: true, canAccessAdmin: true, canViewAllZones: true, sections: new Set(ALL_SECTIONS) }
+  if (!canAccessAdmin) {
+    return { role, isHQ: false, canAccessAdmin: false, canViewAllZones: false, sections: new Set() }
   }
 
-  if (role === 'boss') {
-    return { role, isHQ: true, canAccessAdmin: true, canViewAllZones: true, sections: new Set(ALL_SECTIONS) }
+  let baseSections = new Set<AdminSection>(isHQ ? ALL_SECTIONS : ZONE_SECTIONS);
+
+  // Apply dynamic boolean feature filters if configured for this admin
+  if (hiddenFeatures && role !== 'super_admin') {
+    if (hiddenFeatures.hideAdmin_canManageMasterLibrary) {
+      baseSections.delete('Master Library');
+    }
+    if (hiddenFeatures.hideAdmin_canManageMedia) {
+      baseSections.delete('Media');
+    }
+    if (hiddenFeatures.hideAdmin_canManageSchedules) {
+      baseSections.delete('Schedule Manager');
+    }
+    if (hiddenFeatures.hideAdmin_canManageMembers) {
+      baseSections.delete('Members');
+    }
+    if (hiddenFeatures.hideAdmin_canManageAttendance) {
+      baseSections.delete('Attendance');
+    }
   }
 
-  if (canAccessAdmin && isHQ) {
-    return { role, isHQ: true, canAccessAdmin: true, canViewAllZones: true, sections: new Set(ALL_SECTIONS) }
-  }
-
-  if (canAccessAdmin) {
-    return { role, isHQ: false, canAccessAdmin: true, canViewAllZones: false, sections: new Set(ZONE_SECTIONS) }
-  }
-
-  return { role, isHQ: false, canAccessAdmin: false, canViewAllZones: false, sections: new Set() }
+  return { role, isHQ, canAccessAdmin: true, canViewAllZones: isHQ, sections: baseSections }
 }
 
 export function canAccessAdminSection(

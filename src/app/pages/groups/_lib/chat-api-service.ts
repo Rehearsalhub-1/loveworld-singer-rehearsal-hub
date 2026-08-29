@@ -96,7 +96,7 @@ export class ChatApiService {
       ...(userData.lastName !== undefined ? { last_name: userData.lastName } : {}),
       ...(userData.fullName !== undefined ? { fullName: userData.fullName } : {}),
       ...(userData.profilePic !== undefined ? { profile_image_url: userData.profilePic } : {}),
-    })
+    }).catch(() => {})
   }
 
   /**
@@ -392,13 +392,16 @@ export class ChatApiService {
         if ((chatData as { isActive?: boolean }).isActive === false) continue
         if (chatData.type === 'direct' && !chatData.participantNames) {
           const participantNames: { [key: string]: string } = {}
-          for (const participantId of chatData.participants || []) {
-            if (participantId !== userId) {
+          for (const rawParticipant of chatData.participants || []) {
+            const participantId = typeof rawParticipant === 'object' && rawParticipant !== null
+              ? ((rawParticipant as any).id || (rawParticipant as any).userId || (rawParticipant as any).uid || '')
+              : String(rawParticipant || '');
+            if (participantId && participantId !== userId && participantId !== '[object Object]') {
               try {
-                const userData = await this.getUser(participantId)
-                participantNames[participantId] = userData?.fullName || 'Unknown User'
+                const userData = await this.getUser(participantId);
+                participantNames[participantId] = userData?.fullName || 'Unknown User';
               } catch {
-                participantNames[participantId] = 'Unknown User'
+                participantNames[participantId] = 'Unknown User';
               }
             }
           }

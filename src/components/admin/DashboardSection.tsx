@@ -5,7 +5,7 @@ import { useZone } from '@/hooks/useZone';
 import { useAuth } from '@/stores/authStore';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
-import { adminApi as apiClient } from '@/lib/admin-api';
+import { apiClient } from '@/lib/api-client';
 import {
   Users, Crown, Music, Calendar, TrendingUp,
   Link as LinkIcon, Copy, CheckCircle, CreditCard,
@@ -18,28 +18,35 @@ import { useAdminTheme } from './AdminThemeProvider';
 // Number Counter with smooth cubic easing
 function AnimatedCounter({ value, duration = 800 }: { value: number; duration?: number }) {
   const [display, setDisplay] = useState(0);
-  const ref = useRef<number>(0);
 
   useEffect(() => {
-    if (value === 0) { setDisplay(0); return; }
-    const start = ref.current;
-    const diff = value - start;
-    const startTime = performance.now();
+    let startTimestamp: number | null = null;
+    const startValue = 0;
+    const endValue = value;
 
-    const step = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(start + diff * eased);
-      setDisplay(current);
-      if (progress < 1) requestAnimationFrame(step);
-      else ref.current = value;
+    if (endValue === 0) {
+      setDisplay(0);
+      return;
+    }
+
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      // Ease out cubic
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.floor(easeProgress * (endValue - startValue) + startValue));
+
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        setDisplay(endValue);
+      }
     };
 
-    requestAnimationFrame(step);
+    window.requestAnimationFrame(step);
   }, [value, duration]);
 
-  return <>{display.toLocaleString()}</>;
+  return <span>{display.toLocaleString()}</span>;
 }
 
 // Safe Program Date Formatter
@@ -77,7 +84,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
   const { profile } = useAuth();
   const { isPremiumTier } = useSubscription();
   const { theme } = useAdminTheme();
-  const { selectedZoneId, selectedZone, isGlobalView, isHQAdmin, zoneScopeLabel } = useAdminZone();
+  const { selectedZoneId, selectedZone, isGlobalView, isHQAdmin, zoneScopeLabel, selectedChurchId } = useAdminZone();
 
   const [members, setMembers] = useState<any[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
@@ -93,35 +100,30 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
     setIsLoading(true);
     try {
       // 1. Fetch directory members scoped by active tenant
-      const dirRes = await apiClient.get<{ success: boolean; data: any[] }>('/profiles/directory').catch(() => null);
-      if (dirRes?.success !== false && Array.isArray(dirRes?.data)) {
-        setMembers(dirRes.data);
-      }
+      const dirRes = await apiClient.get<any>('/profiles/directory').catch(() => null);
+      const memberList = Array.isArray(dirRes?.data) ? dirRes.data : (Array.isArray(dirRes) ? dirRes : []);
+      setMembers(memberList);
 
       // 2. Fetch programs scoped by active tenant
-      const progRes = await apiClient.get<{ success: boolean; data: any[] }>('/programs').catch(() => null);
-      if (progRes?.success !== false && Array.isArray(progRes?.data)) {
-        setTotalPraiseNights(progRes.data.length);
-        setRecentPrograms(progRes.data.slice(0, 6));
-      }
+      const progRes = await apiClient.get<any>('/programs').catch(() => null);
+      const progList = Array.isArray(progRes?.data) ? progRes.data : (Array.isArray(progRes) ? progRes : []);
+      setTotalPraiseNights(progList.length);
+      setRecentPrograms(progList.slice(0, 6));
 
       // 3. Fetch pending song submissions
-      const subRes = await apiClient.get<{ success: boolean; data: any[] }>('/submitted-songs').catch(() => null);
-      if (subRes?.success !== false && Array.isArray(subRes?.data)) {
-        const pending = subRes.data.filter((s: any) => s.status === 'pending' || !s.status);
-        setPendingSubmissions(pending.length);
-      }
+      const subRes = await apiClient.get<any>('/submitted-songs').catch(() => null);
+      const subList = Array.isArray(subRes?.data) ? subRes.data : (Array.isArray(subRes) ? subRes : []);
+      const pending = subList.filter((s: any) => s.status === 'pending' || !s.status);
+      setPendingSubmissions(pending.length);
 
-      // 4. Fetch songs count (both program repertoire & master library)
+      // 4. Fetch songs count (both program Songs & master library)
       const [pnSongsRes, masterSongsRes] = await Promise.all([
-        apiClient.get<{ success: boolean; data: any[] }>('/songs/praise-night').catch(() => null),
-        apiClient.get<{ success: boolean; data: any[] }>('/songs/master').catch(() => null),
+        apiClient.get<any>('/songs/praise-night').catch(() => null),
+        apiClient.get<any>('/songs/master').catch(() => null),
       ]);
-      const pnCount = Array.isArray(pnSongsRes?.data) ? pnSongsRes.data.length : null;
-      const masterCount = Array.isArray(masterSongsRes?.data) ? masterSongsRes.data.length : null;
-      if (pnCount !== null || masterCount !== null) {
-        setTotalSongs((pnCount || 0) + (masterCount || 0));
-      }
+      const pnList = Array.isArray(pnSongsRes?.data) ? pnSongsRes.data : (Array.isArray(pnSongsRes) ? pnSongsRes : []);
+      const masterList = Array.isArray(masterSongsRes?.data) ? masterSongsRes.data : (Array.isArray(masterSongsRes) ? masterSongsRes : []);
+      setTotalSongs(pnList.length + masterList.length);
 
       // Set invite link
       const code = selectedZone?.invitationCode || currentZone?.invitationCode || '';
@@ -132,7 +134,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
     } finally {
       setIsLoading(false);
     }
-  }, [selectedZoneId, selectedZone, currentZone]);
+  }, [selectedZoneId, selectedChurchId, isGlobalView, selectedZone, currentZone]);
 
   useEffect(() => {
     loadData();
@@ -193,7 +195,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
           )}
 
           <button
-            onClick={() => onSectionChange?.('Pages')}
+            onClick={() => onSectionChange?.('Programs')}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all active:scale-95 shadow-xs shadow-purple-600/20"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -233,7 +235,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
 
         {/* KPI 2: Praise Nights / Programs */}
         <div 
-          onClick={() => onSectionChange?.('Pages')}
+          onClick={() => onSectionChange?.('Programs')}
           className="group relative overflow-hidden bg-white rounded-3xl p-5 md:p-6 border border-slate-200/70 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
         >
           <div className="flex items-center justify-between mb-4">
@@ -249,7 +251,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
               <AnimatedCounter value={totalPraiseNights} />
             </p>
             <p className="text-xs font-bold text-slate-600">
-              {isGlobalView ? 'All Praise Nights' : 'Zone Programs'}
+              {isGlobalView ? 'All Programs' : 'Programs'}
             </p>
             <p className="text-[11px] text-slate-400 font-medium">
               Active, upcoming & archived
@@ -257,9 +259,9 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
           </div>
         </div>
 
-        {/* KPI 3: Repertoire & Catalog Songs */}
+        {/* KPI 3: Songs & Catalog Songs */}
         <div 
-          onClick={() => onSectionChange?.('Master Library')}
+          onClick={() => onSectionChange?.('All Ministered')}
           className="group relative overflow-hidden bg-white rounded-3xl p-5 md:p-6 border border-slate-200/70 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
         >
           <div className="flex items-center justify-between mb-4">
@@ -267,7 +269,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
               <Music className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-black text-amber-600 bg-amber-50/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
-              Repertoire
+              Songs
             </span>
           </div>
           <div className="space-y-1">
@@ -275,10 +277,10 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
               <AnimatedCounter value={totalSongs} />
             </p>
             <p className="text-xs font-bold text-slate-600">
-              {isGlobalView ? 'Master Repertoire' : 'Zone Songs'}
+              {isGlobalView ? 'All Ministered' : 'Ministered Songs'}
             </p>
             <p className="text-[11px] text-slate-400 font-medium">
-              Vocal parts, scores & lyrics
+              Songs & scores
             </p>
           </div>
         </div>
@@ -329,7 +331,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <button
-            onClick={() => onSectionChange?.('Pages')}
+            onClick={() => onSectionChange?.('Programs')}
             className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-purple-50/70 border border-slate-200/60 hover:border-purple-200 text-left transition-all group"
           >
             <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -355,14 +357,14 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
           </button>
 
           <button
-            onClick={() => onSectionChange?.('Master Library')}
+            onClick={() => onSectionChange?.('All Ministered')}
             className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-amber-50/70 border border-slate-200/60 hover:border-amber-200 text-left transition-all group"
           >
             <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
               <Music className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-900 truncate">Repertoire</p>
+              <p className="text-xs font-bold text-slate-900 truncate">Ministered</p>
               <p className="text-[10px] text-slate-400 truncate">Song catalog</p>
             </div>
           </button>
@@ -402,11 +404,11 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/70 shadow-xs flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-black text-slate-900">Recent Programs & Rehearsals</h3>
-              <p className="text-xs text-slate-400">Latest active events in current scope</p>
+              <h3 className="text-sm font-black text-slate-900">Recent Programs</h3>
+              <p className="text-xs text-slate-400">Your most recent rehearsal programs</p>
             </div>
             <button
-              onClick={() => onSectionChange?.('Pages')}
+              onClick={() => onSectionChange?.('Programs')}
               className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 bg-purple-50 px-3 py-1.5 rounded-xl transition-colors"
             >
               View All <ArrowRight className="w-3.5 h-3.5" />
@@ -421,7 +423,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
                 return (
                   <div 
                     key={prog.id || idx}
-                    onClick={() => onSectionChange?.('Pages')}
+                    onClick={() => onSectionChange?.('Programs')}
                     className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200/60 hover:bg-purple-50/50 hover:border-purple-200 transition-all cursor-pointer group"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
@@ -471,7 +473,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
                 Create a new program or rehearsal schedule from the Programs section
               </p>
               <button
-                onClick={() => onSectionChange?.('Pages')}
+                onClick={() => onSectionChange?.('Programs')}
                 className="mt-3.5 px-3.5 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-xl hover:bg-purple-700 transition-colors"
               >
                 Create Program
@@ -484,7 +486,7 @@ export default function DashboardSection({ onSectionChange }: DashboardSectionPr
         <div className="bg-white rounded-3xl p-6 border border-slate-200/70 shadow-xs flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-sm font-black text-slate-900">Member Directory</h3>
+              <h3 className="text-sm font-black text-slate-900">Members</h3>
               <p className="text-xs text-slate-400">{members.length} total registered</p>
             </div>
             <button

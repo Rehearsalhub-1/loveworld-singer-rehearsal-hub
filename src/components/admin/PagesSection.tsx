@@ -306,13 +306,13 @@ export default function PagesSection(props: PagesSectionProps) {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-black text-slate-900 tracking-tight">
-                    Programs & Sets
+                    Programs
                   </h2>
                   <span className="text-[10px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
                     {pages.length}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium">Rehearsal & Praise Night Sets</p>
+                <p className="text-[10px] text-slate-400 font-medium">Rehearsal programs & setlists</p>
               </div>
             </div>
 
@@ -777,7 +777,7 @@ export default function PagesSection(props: PagesSectionProps) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100/90">
-                          {filteredSongs.slice(startIndex, startIndex + itemsPerPage).map((song, index) => {
+                          {(songSearchQuery ? filteredSongs : filteredSongs.slice(startIndex, startIndex + itemsPerPage)).map((song, index) => {
                             const isHeard = song.status === 'heard';
                             const isActive = (song as any).isActive;
 
@@ -907,7 +907,7 @@ export default function PagesSection(props: PagesSectionProps) {
 
                   {/* MOBILE VIEW: Touch-Friendly Responsive Song Cards */}
                   <div className="md:hidden space-y-2.5">
-                    {filteredSongs.slice(startIndex, startIndex + itemsPerPage).map((song, index) => {
+                    {(songSearchQuery ? filteredSongs : filteredSongs.slice(startIndex, startIndex + itemsPerPage)).map((song, index) => {
                       const isHeard = song.status === 'heard';
                       const isActive = (song as any).isActive;
 
@@ -1014,10 +1014,12 @@ export default function PagesSection(props: PagesSectionProps) {
                   </div>
 
                   {/* Pagination Controls */}
-                  {totalPages > 1 && (
+                  {!songSearchQuery && totalPages > 1 && (
                     <div className="mt-4 p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between text-xs">
                       <span className="text-slate-500 font-medium text-[11px]">
-                        Showing {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredSongs.length)} of {filteredSongs.length} tracks
+                        {songSearchQuery
+                          ? `${filteredSongs.length} result${filteredSongs.length !== 1 ? 's' : ''} matching "${songSearchQuery}"`
+                          : `Showing ${startIndex + 1}–${Math.min(startIndex + itemsPerPage, filteredSongs.length)} of ${filteredSongs.length} tracks`}
                       </span>
                       <div className="flex items-center gap-1">
                         <button

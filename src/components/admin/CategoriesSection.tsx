@@ -77,6 +77,7 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
   // Local Audio Player
   const [playingSongId, setPlayingSongId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Category | null>(null);
 
   const handlePlaySong = (songId: string, audioUrl?: string) => {
     if (!audioUrl) return;
@@ -299,7 +300,11 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
 
   // Handle Delete Category
   const handleDelete = async (category: Category) => {
-    if (!window.confirm(`Delete the category "${category.name}"?`)) return;
+    setDeleteConfirm(category);
+  };
+
+  const confirmDelete = async (category: Category) => {
+    setDeleteConfirm(null);
     try {
       if (category.id && !category.id.startsWith('gen-')) {
         await apiClient.delete(`/categories/${encodeURIComponent(category.id)}`);
@@ -329,7 +334,7 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
             </div>
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight">Song Categories</h1>
+                <h1 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight">Categories</h1>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
                   <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
                   {isGlobalView ? 'Global HQ Scope' : selectedZone?.name || 'Selected Zone'}
@@ -339,7 +344,7 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium mt-1">
-                Classify and manage repertoire songs by genre, service theme, and liturgical category.
+                Group songs by theme, genre, or service type.
               </p>
             </div>
           </div>
@@ -420,7 +425,7 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
               type="text"
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              placeholder="Search song categories..."
+              placeholder="Search categories..."
               className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all placeholder:text-slate-400"
             />
             {localSearch && (
@@ -611,12 +616,41 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
             </div>
             <h3 className="text-lg font-black text-slate-900 mb-1">No Categories Found</h3>
             <p className="text-xs text-slate-400 max-w-xs mx-auto mb-4">
-              {localSearch ? 'No song categories match your search.' : 'Create a category to group ministered praise songs.'}
+              {localSearch ? 'No categories match your search.' : 'Create a category to group songs.'}
             </p>
           </div>
         )
       )}
       </div>
+
+      {/* Delete Category Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[600] p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Delete Category</h3>
+                <p className="text-xs text-slate-500">This cannot be undone</p>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-3 mb-5">
+              <p className="text-xs font-semibold text-slate-800">"{deleteConfirm.name}"</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Songs with this category will not be deleted — only the category tag will be removed.</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors">
+                Cancel
+              </button>
+              <button onClick={() => confirmDelete(deleteConfirm)} className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Category Modal */}
       {showModal && modalCategory && (

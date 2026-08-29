@@ -111,7 +111,8 @@ export default function AttendanceSection() {
     } finally {
       setLoading(false);
     }
-  }, [effectiveZoneId, isGlobalView, isChurchScope, selectedChurchId, selectedDate, allRecords.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveZoneId, isGlobalView, isChurchScope, selectedChurchId, selectedDate]);
 
   useEffect(() => {
     loadAttendance();
@@ -156,13 +157,13 @@ export default function AttendanceSection() {
     setSubmittingManual(true);
 
     try {
-      const res = await apiClient.post<{ success: boolean; data: any }>('/attendance/manual', {
-        userName: name,
+      const res = await apiClient.post<{ success: boolean; data: any }>('/attendance/check-in', {
         eventName: manualEvent.trim() || 'Rehearsal',
         status: manualStatus,
         zoneId: isChurchScope ? selectedChurchId || 'church' : (effectiveZoneId || 'global'),
         subGroupId: isChurchScope ? selectedChurchId : undefined,
         dateString: selectedDate,
+        checkInTime: new Date().toISOString(),
       });
 
       if (res?.data) {
@@ -462,7 +463,7 @@ export default function AttendanceSection() {
             </div>
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight">Attendance Studio</h1>
+                <h1 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight">Attendance</h1>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
                   <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
                   {isHQ ? 'Global HQ Scope' : selectedZone?.name || 'Selected Zone'}
@@ -470,8 +471,8 @@ export default function AttendanceSection() {
               </div>
               <p className="text-xs text-slate-500 font-medium mt-1">
                 {viewMode === 'daily' 
-                  ? 'Real-time rehearsal check-ins, barcode scans, and clock-out verifications.' 
-                  : 'All-time aggregated participation ratings and ministerial cumulative scores.'}
+                  ? 'Track check-ins, clock-outs and session records.' 
+                  : 'All-time attendance records and participation rates.'}
               </p>
             </div>
           </div>

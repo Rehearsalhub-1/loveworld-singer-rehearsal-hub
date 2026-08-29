@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { useAuth } from '@/stores/authStore';
-import OrganizationSwitcher from '@/components/OrganizationSwitcher';
+import AdminScopeDisplay from '@/components/admin/AdminScopeDisplay';
 
 interface AdminZoneHeaderProps {
   activeSection?: string;
@@ -105,7 +105,7 @@ export default function AdminZoneHeader({ activeSection = 'Dashboard' }: AdminZo
 
       {/* Right: Canonical Organization Switcher & Admin Profile */}
       <div className="flex items-center gap-2.5 md:gap-3">
-        <OrganizationSwitcher />
+        <AdminScopeDisplay />
 
         {/* User Badge */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/80">

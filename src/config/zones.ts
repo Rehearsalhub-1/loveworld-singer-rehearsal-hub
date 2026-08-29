@@ -272,10 +272,11 @@ export function isBossZone(zoneId: string | undefined): boolean {
 
 export const BOSS_ZONE_ID = 'zone-boss'
 
-// HQ groups - Central Headquarters
+// HQ groups - Central Headquarters & Sub-units
 export const HQ_GROUP_IDS = [
   'zone-001', 'zone-002', 'zone-003', 'zone-004', 'zone-005',
-  'loveworld-singers-hq'
+  'zone-president', 'zone-director', 'zone-oftp', 'zone-orchestra',
+  'loveworld-singers-hq', 'hq'
 ]
 
 export function isHQGroup(zoneId: string | undefined): boolean {

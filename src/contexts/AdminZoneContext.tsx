@@ -37,6 +37,8 @@ interface AdminZoneContextType {
   userChurches: ChurchSubGroup[];
   isLoadingChurches: boolean;
   refreshUserChurches: () => Promise<void>;
+  /** The org this admin is LOCKED to as admin. Cannot be changed except by HQ admins for view switching. */
+  adminLockedOrgId: string | null;
 }
 
 const AdminZoneContext = createContext<AdminZoneContextType | undefined>(undefined);
@@ -112,14 +114,19 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   }, [accessibleSubgroups, activeOrganization]);
 
   const setSelectedZoneId = useCallback((zoneId: string) => {
+    // Zone switching is disabled for non-HQ admins — they are locked to their org.
+    // HQ admins can switch between zones for viewing purposes only.
+    if (!isHQAdmin) {
+      console.warn('[AdminZoneContext] Zone switching blocked — non-HQ admin cannot change org scope');
+      return;
+    }
     if (zoneId === 'all') {
-      // If HQ admin selects all, default to primary HQ organization
       const hqOrg = accessibleOrganizations.find((o) => o.isHq) || accessibleOrganizations[0];
       if (hqOrg) switchOrganization(hqOrg.id);
     } else {
       switchOrganization(zoneId);
     }
-  }, [accessibleOrganizations, switchOrganization]);
+  }, [accessibleOrganizations, switchOrganization, isHQAdmin]);
 
   const setSelectedChurchId = useCallback((churchId: string | null) => {
     switchSubgroup(churchId);
@@ -128,6 +135,20 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   const refreshUserChurches = useCallback(async () => {
     useOrganizationStore.getState().refreshOrganizations();
   }, []);
+
+  // The org this admin is locked to as an admin (not just as a member)
+  const adminLockedOrgId = activeOrganization?.id || null;
+
+  // Keep the API client tenant headers in sync with the active multi-tenant context
+  useEffect(() => {
+    apiClient.setActiveScope({
+      organizationId: activeOrganization?.id || null,
+      subgroupId: activeSubgroup?.id || null,
+      zoneId: activeOrganization?.id || null,
+      churchId: activeSubgroup?.id || null,
+      scope: activeSubgroup?.id ? 'church' : (activeOrganization?.isHq ? 'global' : 'zone'),
+    });
+  }, [activeOrganization?.id, activeOrganization?.isHq, activeSubgroup?.id]);
 
   const zoneScopeLabel = isChurchScope
     ? (selectedChurch?.name || 'Church Scope')
@@ -152,6 +173,7 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
         userChurches,
         isLoadingChurches: false,
         refreshUserChurches,
+        adminLockedOrgId,
       }}
     >
       {children}

@@ -49,7 +49,7 @@ export const MasterLibraryHeader: React.FC<MasterLibraryHeaderProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">Master Library</h1>
+              <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">All Ministered</h1>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
                 <Music className="w-3 h-3" />
                 {safeStats.totalSongs.toLocaleString()} Songs
@@ -67,7 +67,7 @@ export const MasterLibraryHeader: React.FC<MasterLibraryHeaderProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 font-medium">Official global song repertoire for ministry services and praise nights</p>
+            <p className="text-[11px] text-slate-400 font-medium">Global catalog of all ministered songs.</p>
           </div>
         </div>
 

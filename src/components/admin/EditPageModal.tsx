@@ -82,6 +82,8 @@ export default function EditPageModal({
   isSaving = false
 }: EditPageModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showNewCategoryInput, setShowNewCategoryInput] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState('');
 
   if (!isOpen) return null;
 
@@ -179,7 +181,7 @@ export default function EditPageModal({
             </div>
           </div>
 
-          {/* Status & Parent Category (2 Columns) */}
+          {/* Status & Parent Category */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -201,18 +203,69 @@ export default function EditPageModal({
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                 Parent Category Group
               </label>
-              <select
-                value={pageCategory}
-                onChange={(e) => setPageCategory(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all shadow-xs"
-              >
-                <option value="">No Parent Group (Default)</option>
-                {availablePageCategories.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              {!showNewCategoryInput ? (
+                <div className="flex gap-2">
+                  <select
+                    value={pageCategory}
+                    onChange={(e) => setPageCategory(e.target.value)}
+                    className="flex-1 min-w-0 px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all shadow-xs"
+                  >
+                    <option value="">No Parent Group (Default)</option>
+                    {availablePageCategories.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewCategoryInput(true); setNewCategoryName(''); }}
+                    className="px-3 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition-colors flex-shrink-0 flex items-center gap-1"
+                    title="Create a new page category"
+                  >
+                    + New
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="New category name..."
+                      className="flex-1 min-w-0 px-3.5 py-2.5 text-sm bg-white border border-purple-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 transition-all shadow-xs"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newCategoryName.trim()) {
+                          setPageCategory(newCategoryName.trim());
+                          setShowNewCategoryInput(false);
+                        }
+                        if (e.key === 'Escape') setShowNewCategoryInput(false);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newCategoryName.trim()) setPageCategory(newCategoryName.trim());
+                        setShowNewCategoryInput(false);
+                      }}
+                      disabled={!newCategoryName.trim()}
+                      className="px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-40 flex-shrink-0"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCategoryInput(false)}
+                      className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors flex-shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Press Enter or click Add. The category will be created when you save the program.</p>
+                </>
+              )}
             </div>
           </div>
 

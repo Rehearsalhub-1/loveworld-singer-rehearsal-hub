@@ -5,6 +5,8 @@ type JwtPayload = {
   sub?: string
   role?: string
   exp?: number
+  hasHqAccess?: boolean
+  has_hq_access?: boolean
 }
 
 function decodeJwtPayload(token: string): JwtPayload | null {
@@ -24,14 +26,18 @@ function getAccessToken(req: NextRequest): string | null {
   return req.cookies.get('lwsrh_jwt')?.value ?? null
 }
 
-function isTokenValid(token: string | null): { ok: boolean; role?: string } {
+function isTokenValid(token: string | null): { ok: boolean; role?: string; hasHqAccess?: boolean } {
   if (!token) return { ok: false }
   const payload = decodeJwtPayload(token)
   if (!payload?.sub) return { ok: false }
   if (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()) {
     return { ok: false }
   }
-  return { ok: true, role: payload.role }
+  return {
+    ok: true,
+    role: payload.role,
+    hasHqAccess: Boolean(payload.hasHqAccess || payload.has_hq_access),
+  }
 }
 
 export async function middleware(req: NextRequest) {
@@ -64,17 +70,28 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (tokenCheck.ok && tokenCheck.role) {
-    const role = tokenCheck.role.toLowerCase()
-    const adminRoles = new Set(['admin', 'hq_admin', 'super_admin', 'zone_admin', 'zone_coordinator', 'subgroup_admin', 'subgroup_coordinator'])
+  if (tokenCheck.ok) {
+    const role = (tokenCheck.role || '').toLowerCase()
+    const isHq = Boolean(tokenCheck.hasHqAccess || role === 'hq_admin' || role === 'admin' || role === 'super_admin' || role === 'boss')
+    const adminRoles = new Set([
+      'admin',
+      'hq_admin',
+      'super_admin',
+      'boss',
+      'zone_admin',
+      'zone_coordinator',
+      'subgroup_admin',
+      'subgroup_coordinator',
+      'church_coordinator',
+    ])
 
-    if (pathname.startsWith('/admin') && !adminRoles.has(role)) {
+    if (pathname.startsWith('/admin') && !adminRoles.has(role) && !isHq) {
       const url = req.nextUrl.clone()
       url.pathname = '/home'
       return NextResponse.redirect(url)
     }
 
-    if (pathname.startsWith('/boss') && role !== 'hq_admin' && role !== 'admin' && role !== 'super_admin') {
+    if (pathname.startsWith('/boss') && !isHq) {
       const url = req.nextUrl.clone()
       url.pathname = '/home'
       return NextResponse.redirect(url)

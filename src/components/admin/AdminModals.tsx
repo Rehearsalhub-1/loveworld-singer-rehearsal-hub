@@ -353,12 +353,28 @@ export default function AdminModals(props: AdminModalsProps) {
 
             <div className="mb-6">
               <p className="text-gray-700 mb-2">
-                Are you sure you want to delete the page:
+                Are you sure you want to delete this program? This cannot be undone.
               </p>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="font-medium text-gray-900">{pageToDelete.name}</p>
-                <p className="text-sm text-gray-500">{pageToDelete.location}</p>
-                <p className="text-sm text-gray-500">{pageToDelete.date}</p>
+              <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                <p className="font-semibold text-gray-900">{pageToDelete.name}</p>
+                {pageToDelete.location && (
+                  <p className="text-sm text-gray-500">📍 {pageToDelete.location}</p>
+                )}
+                {pageToDelete.date && (
+                  <p className="text-sm text-gray-500">📅 {pageToDelete.date}</p>
+                )}
+                {(() => {
+                  const songCount = Array.isArray((pageToDelete as any).songIds)
+                    ? (pageToDelete as any).songIds.length
+                    : Array.isArray((pageToDelete as any).songs)
+                    ? (pageToDelete as any).songs.length
+                    : 0;
+                  return songCount > 0 ? (
+                    <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
+                      ⚠️ This will remove {songCount} song{songCount !== 1 ? 's' : ''} from this program
+                    </p>
+                  ) : null;
+                })()}
               </div>
             </div>
 

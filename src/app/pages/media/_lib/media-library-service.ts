@@ -222,7 +222,7 @@ class MediaLibraryService {
   }
 
   async getAllMedia(limitCount: number = 24): Promise<MediaItem[]> {
-    const params = new URLSearchParams({ limit: String(limitCount) })
+    const params = new URLSearchParams({ limit: String(limitCount), type: 'video' })
     const scope = getActiveScope()
     if (scope.zoneId) params.set('zoneId', scope.zoneId)
     const res = await apiClient.get<{ success?: boolean; data?: any[] }>(`/media?${params.toString()}`)
@@ -232,7 +232,7 @@ class MediaLibraryService {
   }
 
   async getMediaForZone(isHQZone: boolean, limitCount: number = 24): Promise<MediaItem[]> {
-    const params = new URLSearchParams({ limit: String(limitCount) })
+    const params = new URLSearchParams({ limit: String(limitCount), type: 'video' })
     const scope = getActiveScope()
     if (scope.zoneId) params.set('zoneId', scope.zoneId)
     if (isHQZone) params.set('isHqOnly', 'true')
@@ -243,7 +243,7 @@ class MediaLibraryService {
   }
 
   async loadMoreMedia(lastCreatedAt: Date, limitCount: number = 12): Promise<MediaItem[]> {
-    const params = new URLSearchParams({ limit: String(limitCount) })
+    const params = new URLSearchParams({ limit: String(limitCount), type: 'video' })
     const scope = getActiveScope()
     if (scope.zoneId) params.set('zoneId', scope.zoneId)
     if (lastCreatedAt) params.set('after', toDate(lastCreatedAt).toISOString())

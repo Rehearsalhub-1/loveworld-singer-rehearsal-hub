@@ -7,7 +7,7 @@ import {
   FileVideo, FileAudio, FileImage, Layers, Sparkles, Check,
   Copy, Volume2, Globe2, ChevronDown, ArrowUpDown, Clock,
   Eye, AlertCircle, Upload, CheckCircle2, ShieldCheck, Download,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, MoreVertical
 } from 'lucide-react';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { adminApi as apiClient } from '@/lib/admin-api';
@@ -85,6 +85,43 @@ function getYouTubeThumbnail(url: string): string | null {
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
 
+function getMediaThumbnail(item: MediaItem): string | null {
+  if (item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('http')) {
+    return item.thumbnail;
+  }
+  const url = item.url || item.videoUrl || '';
+  if (!url) return null;
+
+  // 1. YouTube
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    return getYouTubeThumbnail(url);
+  }
+
+  // 2. Direct Image
+  if (item.type === 'image' || url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i) || url.includes('/image/upload/')) {
+    return url;
+  }
+
+  // 3. Cloudinary Video Poster
+  if (url.includes('res.cloudinary.com') && (url.includes('/video/upload/') || url.match(/\.(mp4|mov|webm|mkv)$/i))) {
+    return url.replace(/\/video\/upload\/(v\d+\/)?/, '/video/upload/so_1,w_600,h_360,c_fill/$1').replace(/\.[a-zA-Z0-9]+$/, '.jpg');
+  }
+
+  return null;
+}
+
+function getFormatBadge(url: string, type: string): string {
+  if (!url) return type.toUpperCase();
+  const clean = url.split('?')[0].toLowerCase();
+  const ext = clean.match(/\.([a-z0-9]{2,4})$/);
+  if (ext) return ext[1].toUpperCase();
+  if (url.includes('youtube') || url.includes('youtu.be')) return 'YOUTUBE';
+  if (type === 'video') return 'MP4';
+  if (type === 'audio') return 'MP3';
+  if (type === 'image') return 'PNG';
+  return 'FILE';
+}
+
 function formatDate(dateStr?: string) {
   if (!dateStr) return 'Recently';
   try {
@@ -129,10 +166,10 @@ export default function MediaUploadSection() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Filter & Search & Pagination State
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [filterType, setFilterType] = useState<FilterType>('all');
-  const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(48);
@@ -158,6 +195,14 @@ export default function MediaUploadSection() {
   // Feedback State
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = () => setOpenMenuId(null);
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   // Load Media from Backend API (cached across tab navigation)
   const loadMedia = useCallback(async (isRefresh = false) => {
@@ -379,6 +424,35 @@ export default function MediaUploadSection() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Export CSV
+  const handleExportCSV = () => {
+    const itemsToExport = selectedIds.size > 0 
+      ? safeItems.filter(i => selectedIds.has(i.id))
+      : filteredItems;
+
+    if (itemsToExport.length === 0) return;
+
+    const headers = ['ID', 'Title', 'Type', 'Direct_URL', 'Zone', 'Created_At'];
+    const rows = itemsToExport.map(i => [
+      i.id,
+      `"${(i.title || '').replace(/"/g, '""')}"`,
+      i.type,
+      `"${i.url || i.videoUrl || ''}"`,
+      i.zoneId || 'global',
+      i.createdAt || ''
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `media_library_export_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Safe Filter & Sort
   const safeItems = useMemo(() => (Array.isArray(mediaItems) ? mediaItems : []), [mediaItems]);
 
@@ -440,434 +514,429 @@ export default function MediaUploadSection() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f8fafc] overflow-hidden relative font-sans">
-      {/* ── Dynamic Purple / Indigo Studio Glows ── */}
-      <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-purple-200/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-1/2 -left-40 w-[600px] h-[600px] bg-indigo-100/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="relative flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 lg:p-8 space-y-6">
 
-      <div className="relative flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar">
+        {/* ── 1. HEADER ROW (Title, Subtitle, Export, Add Product) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Products & Media Assets</h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Manage inventory, pricing, streams, and stems availability across your workspace
+            </p>
+          </div>
 
-        {/* ── 1. STUDIO HEADER & QUICK STATS ── */}
-        <div className="px-4 sm:px-6 lg:px-8 pt-6 pb-3 w-full">
-          <div className="bg-white rounded-3xl p-5 lg:p-6 border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5 w-full">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-purple-200 shrink-0">
-                <Film className="w-6 h-6" />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 rounded-xl text-xs font-semibold shadow-2xs transition-all active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>Export</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-indigo-200 transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Add Product</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── 2. TOP 4 METRIC STAT CARDS ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Total Products */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-slate-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Products</span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black text-slate-900 tracking-tight">Media Studio & Assets</h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-purple-100 text-purple-700 border border-purple-200">
-                    Pro Studio
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  <span className="font-bold text-purple-700">{stats.all.toLocaleString()}</span> assets in catalog ({stats.audio.toLocaleString()} Audio & Stems, {stats.image.toLocaleString()} Sheets, {stats.video.toLocaleString()} Videos)
-                </p>
+              <MoreVertical className="w-3.5 h-3.5 text-slate-300" />
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">{stats.all.toLocaleString()}</div>
+              <div className="flex items-center justify-between mt-2 text-[11px]">
+                <span className="inline-flex items-center font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md text-[10px]">+4.2%</span>
+                <span className="text-slate-400">Last 7 days</span>
               </div>
             </div>
+          </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <button
-                onClick={() => loadMedia(true)}
-                disabled={refreshing}
-                title="Refresh media"
-                className="p-2.5 text-slate-500 hover:text-purple-700 hover:bg-purple-50 border border-slate-200 rounded-2xl transition-all active:scale-95 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-purple-600' : ''}`} />
-              </button>
+          {/* Card 2: Video Streams */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center gap-2">
+                <FileVideo className="w-4 h-4 text-indigo-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Video Streams</span>
+              </div>
+              <MoreVertical className="w-3.5 h-3.5 text-slate-300" />
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">{stats.video.toLocaleString()}</div>
+              <div className="flex items-center justify-between mt-2 text-[11px]">
+                <span className="inline-flex items-center font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md text-[10px]">+12.5%</span>
+                <span className="text-slate-400">Ministrations</span>
+              </div>
+            </div>
+          </div>
 
-              <button
-                onClick={handleOpenAddModal}
-                className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Media Asset</span>
-              </button>
+          {/* Card 3: Audio & Stems */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center gap-2">
+                <FileAudio className="w-4 h-4 text-amber-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Audio & Stems</span>
+              </div>
+              <MoreVertical className="w-3.5 h-3.5 text-slate-300" />
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">{stats.audio.toLocaleString()}</div>
+              <div className="flex items-center justify-between mt-2 text-[11px]">
+                <span className="inline-flex items-center font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md text-[10px]">Multitracks</span>
+                <span className="text-slate-400">Vocals & Bands</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Sheets & Covers */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center gap-2">
+                <FileImage className="w-4 h-4 text-emerald-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sheets & Resources</span>
+              </div>
+              <MoreVertical className="w-3.5 h-3.5 text-slate-300" />
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">{stats.image.toLocaleString()}</div>
+              <div className="flex items-center justify-between mt-2 text-[11px]">
+                <span className="inline-flex items-center font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md text-[10px]">+2.1%</span>
+                <span className="text-slate-400">Published</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── 2. FILTER & TOOLBAR ── */}
-        <div className="px-4 sm:px-6 lg:px-8 py-2 space-y-3 w-full">
-          {/* Filter Tabs */}
-          <div className="flex items-center justify-between gap-2 flex-wrap w-full">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl">
-              {(Object.keys(TYPE_CONFIG) as FilterType[]).map(key => {
-                const meta = TYPE_CONFIG[key];
-                const Icon = meta.icon;
-                const isActive = filterType === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setFilterType(key)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      isActive ? meta.activeBg : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{meta.label}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                      isActive ? meta.badge : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {stats[key]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Bulk Actions Pill Bar */}
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 p-1 bg-purple-50 border border-purple-200 rounded-2xl animate-in fade-in duration-200">
-                <span className="text-xs font-bold text-purple-800 px-2.5">
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  onClick={handleBulkDelete}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Delete Selected</span>
-                </button>
-                <button
-                  onClick={() => setSelectedIds(new Set())}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-                  title="Clear selection"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Main Filter / Search Bar */}
-          <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 w-full">
-            {/* Search Input */}
+        {/* ── 3. SEARCH, FILTER & TAB TOOLBAR (Dribbble Layout) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2">
+          {/* Left: Search input */}
+          <div className="flex items-center gap-2 flex-1 max-w-md">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search assets by title, description, or URL..."
+                placeholder="Search by product name or ID..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-slate-800 placeholder-slate-400"
+                className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-800 placeholder-slate-400 shadow-2xs"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Controls: Sort & View Mode */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Sort Dropdown */}
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value as SortOption)}
-                  className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer transition-all"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="title_asc">Title (A - Z)</option>
-                  <option value="title_desc">Title (Z - A)</option>
-                </select>
-                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-              </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    viewMode === 'grid' ? 'bg-white shadow-xs text-purple-700' : 'text-slate-400 hover:text-slate-700'
-                  }`}
-                  title="Grid Studio View"
-                >
-                  <Grid3x3 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    viewMode === 'table' ? 'bg-white shadow-xs text-purple-700' : 'text-slate-400 hover:text-slate-700'
-                  }`}
-                  title="Table Data View"
-                >
-                  <List className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-white border border-slate-200/80 rounded-xl p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-lg transition-all ${
+                  viewMode === 'table' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-700'
+                }`}
+                title="Table View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-all ${
+                  viewMode === 'grid' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:text-slate-700'
+                }`}
+                title="Grid View"
+              >
+                <Grid3x3 className="w-4 h-4" />
+              </button>
             </div>
+          </div>
+
+          {/* Right: Tabs (All, Active, Draft, Archived) */}
+          <div className="flex items-center gap-1 bg-white border border-slate-200/80 rounded-xl p-1 shadow-2xs self-start md:self-auto">
+            {(Object.keys(TYPE_CONFIG) as FilterType[]).map(key => {
+              const meta = TYPE_CONFIG[key];
+              const isActive = filterType === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setFilterType(key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    isActive
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {meta.label}
+                  <span className={`ml-1.5 text-[10px] ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>
+                    {stats[key]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* ── 3. MAIN MEDIA DISPLAY (GRID / TABLE) ── */}
-        <div className="px-4 sm:px-6 lg:px-8 pb-12 flex-1 w-full">
+        {/* ── 4. DATA CONTENT: TABLE (Dribbble UI) OR GRID ── */}
+        <div className="flex-1 pb-16">
           {loading ? (
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-20 text-center shadow-xs w-full">
-              <RefreshCw className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-3" />
-              <p className="text-sm font-bold text-slate-600">Loading media studio assets...</p>
-              <p className="text-xs text-slate-400 mt-1">Connecting to Media Catalog...</p>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-20 text-center shadow-xs">
+              <RefreshCw className="w-7 h-7 text-indigo-600 animate-spin mx-auto mb-3" />
+              <p className="text-sm font-semibold text-slate-700">Loading catalog assets...</p>
+              <p className="text-xs text-slate-400 mt-1">Connecting to Supabase repository...</p>
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-12 lg:p-16 text-center shadow-xs w-full">
-              <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-100">
-                <Film className="w-8 h-8 text-purple-400" />
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs">
+              <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-slate-100">
+                <Film className="w-6 h-6 text-slate-400" />
               </div>
-              <h3 className="text-base font-black text-slate-900">
-                {searchTerm ? `No assets matching "${searchTerm}"` : 'No media assets in this category'}
+              <h3 className="text-sm font-bold text-slate-900">
+                {searchTerm ? `No products matching "${searchTerm}"` : 'No media assets found'}
               </h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-                {searchTerm ? 'Try searching with different keywords or switch the filter tab.' : 'Publish video recordings, multitrack audio stems, or chord sheets directly to this zone.'}
+              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                Try searching with different terms or click Add Product to upload new media.
               </p>
-              {!searchTerm && (
-                <div className="mt-6 flex items-center justify-center gap-3">
-                  <button
-                    onClick={handleOpenAddModal}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-purple-200 transition-all active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Media Asset</span>
-                  </button>
-                </div>
-              )}
             </div>
-          ) : viewMode === 'grid' ? (
-            /* ─ Studio Grid Mode ─ */
-            <div className="space-y-6 w-full">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-5 w-full">
-                {paginatedItems.map(item => {
-                  const meta = TYPE_CONFIG[item.type] || TYPE_CONFIG.video;
-                  const Icon = meta.icon;
-                  const isImg = item.type === 'image' || Boolean(item.url?.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i)) || Boolean(item.url?.includes('/image/upload/'));
-                  const isYt = Boolean(item.url?.includes('youtube.com') || item.url?.includes('youtu.be'));
-                  const thumb = item.thumbnail || (isImg ? (item.url || item.videoUrl) : isYt ? getYouTubeThumbnail(item.url) : null);
-                  const isSelected = selectedIds.has(item.id);
-                  const isAudioPlaying = playingAudioId === item.id;
-                  const isDeleting = deletingId === item.id;
+          ) : viewMode === 'table' ? (
+            /* ─ High-Fidelity Dribbble Product Table ─ */
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/60 text-slate-500 text-[11px] font-semibold">
+                      <th className="px-4 py-3.5 w-10">
+                        <button
+                          type="button"
+                          onClick={toggleSelectAll}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                            allSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300'
+                          }`}
+                        >
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </button>
+                      </th>
+                      <th className="px-4 py-3.5">Product Name</th>
+                      <th className="px-4 py-3.5 hidden sm:table-cell">ID & Created Date</th>
+                      <th className="px-4 py-3.5 hidden md:table-cell">Type & Format</th>
+                      <th className="px-4 py-3.5 hidden lg:table-cell">Scope / Church</th>
+                      <th className="px-4 py-3.5">Status</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                    {paginatedItems.map(item => {
+                      const meta = TYPE_CONFIG[item.type] || TYPE_CONFIG.video;
+                      const thumb = getMediaThumbnail(item);
+                      const formatBadge = getFormatBadge(item.url || item.videoUrl || '', item.type);
+                      const isSelected = selectedIds.has(item.id);
+                      const isAudioPlaying = playingAudioId === item.id;
+                      const isDeleting = deletingId === item.id;
+                      const cleanId = `#MED-${(item.id.replace(/[^a-zA-Z0-9]/g, '').slice(-6) || '000000').toUpperCase()}`;
 
-                  return (
-                    <div
-                      key={item.id}
-                      className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden group flex flex-col relative ${
-                        isSelected
-                          ? 'border-purple-500 ring-2 ring-purple-200 shadow-md'
-                          : isAudioPlaying
-                          ? 'border-purple-400 ring-2 ring-purple-100 shadow-lg'
-                          : 'border-slate-200/80 hover:border-purple-300 hover:shadow-md'
-                      }`}
-                    >
-                      {/* Media Card Thumbnail / Preview Stage */}
-                      <div className="relative h-44 bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
-                        {thumb ? (
-                          <img
-                            src={thumb}
-                            alt={item.title}
-                            loading="lazy"
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className={`w-14 h-14 rounded-2xl ${meta.bg} flex items-center justify-center`}>
-                            <Icon className={`w-7 h-7 ${meta.color}`} />
-                          </div>
-                        )}
-
-                        {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none z-10">
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold shadow-xs flex items-center gap-1 backdrop-blur-md ${meta.bg} ${meta.color} pointer-events-auto`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-                            {meta.label}
-                          </span>
-
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => setPreviewItem(item)}
+                          className={`hover:bg-slate-50/80 transition-colors group cursor-pointer ${
+                            isSelected ? 'bg-indigo-50/30' : isAudioPlaying ? 'bg-amber-50/30' : ''
+                          }`}
+                        >
                           {/* Select Checkbox */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggleSelectItem(item.id);
-                            }}
-                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all pointer-events-auto shadow-xs ${
-                              isSelected
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-white/90 backdrop-blur-xs text-slate-400 opacity-0 group-hover:opacity-100 hover:text-purple-600'
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          </button>
-                        </div>
-
-                        {/* Prominent In-Card Audio Play/Pause Button (Always visible on audio cards) */}
-                        {item.type === 'audio' && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleAudioPlay(item, e)}
-                            className={`absolute bottom-2.5 right-2.5 z-20 px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all active:scale-95 ${
-                              isAudioPlaying
-                                ? 'bg-purple-600 text-white ring-2 ring-purple-300 animate-pulse'
-                                : 'bg-white/95 text-purple-700 hover:bg-purple-600 hover:text-white'
-                            }`}
-                          >
-                            {isAudioPlaying ? (
-                              <>
-                                <Pause className="w-3.5 h-3.5 fill-current" />
-                                <span>Playing</span>
-                              </>
-                            ) : (
-                              <>
-                                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                                <span>Play</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-
-                        {/* Active Audio Soundwave Indicator Bar */}
-                        {isAudioPlaying && (
-                          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-500 animate-pulse z-10" />
-                        )}
-
-                        {/* Hover Overlay Controls */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10">
-                          {item.type === 'audio' ? (
+                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                             <button
                               type="button"
-                              onClick={(e) => handleToggleAudioPlay(item, e)}
-                              className="w-12 h-12 rounded-full bg-white text-purple-700 flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all"
+                              onClick={() => toggleSelectItem(item.id)}
+                              className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                                isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300'
+                              }`}
                             >
-                              {isAudioPlaying ? (
-                                <Pause className="w-6 h-6 fill-purple-700" />
-                              ) : (
-                                <Play className="w-6 h-6 fill-purple-700 ml-0.5" />
-                              )}
+                              <Check className="w-2.5 h-2.5 stroke-[3]" />
                             </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setPreviewItem(item);
-                              }}
-                              className="w-12 h-12 rounded-full bg-white text-purple-700 flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all"
-                              title="View full preview"
-                            >
-                              <Eye className="w-5 h-5" />
-                            </button>
-                          )}
-                        </div>
+                          </td>
 
-                        {/* Zone / HQ Pill */}
-                        {item.forHq && (
-                          <div className="absolute bottom-2.5 left-2.5 z-10">
-                            <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-amber-500/90 text-white shadow-xs backdrop-blur-xs flex items-center gap-1">
-                              <Sparkles className="w-2.5 h-2.5" /> HQ Only
+                          {/* Product / Asset Name */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {/* Square Thumbnail */}
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200/60 relative flex items-center justify-center">
+                                {thumb ? (
+                                  <img src={thumb} alt={item.title} className="w-full h-full object-cover" />
+                                ) : item.type === 'video' ? (
+                                  <FileVideo className="w-5 h-5 text-indigo-500" />
+                                ) : item.type === 'audio' ? (
+                                  <FileAudio className="w-5 h-5 text-amber-500" />
+                                ) : (
+                                  <FileImage className="w-5 h-5 text-emerald-500" />
+                                )}
+                                {item.type === 'audio' && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleToggleAudioPlay(item, e)}
+                                    className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    {isAudioPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 truncate max-w-[220px] group-hover:text-indigo-600 transition-colors">
+                                  {item.title}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate max-w-[220px]">
+                                  {item.type === 'video' ? 'Video Stream' : item.type === 'audio' ? 'Multitrack Vocal Stem' : 'Sheet Chart / Art'}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* ID & Created Date */}
+                          <td className="px-4 py-3 hidden sm:table-cell">
+                            <div>
+                              <p className="font-mono text-[11px] font-semibold text-slate-800">{cleanId}</p>
+                              <p className="text-[10px] text-slate-400">{formatDate(item.createdAt)}</p>
+                            </div>
+                          </td>
+
+                          {/* Type & Format */}
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {formatBadge}
                             </span>
-                          </div>
-                        )}
-                      </div>
+                          </td>
 
-                      {/* Card Content Details */}
-                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                        <div>
-                          <h4 className="text-xs font-black text-slate-900 line-clamp-1 group-hover:text-purple-700 transition-colors" title={item.title}>
-                            {item.title}
-                          </h4>
-                          <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 min-h-[32px]">
-                            {item.description || item.url || 'No description added.'}
-                          </p>
-                        </div>
+                          {/* Scope / Zone */}
+                          <td className="px-4 py-3 hidden lg:table-cell">
+                            <span className="text-[11px] text-slate-500">
+                              {item.forHq ? 'HQ Executive' : 'Global Scope'}
+                            </span>
+                          </td>
 
-                        {/* Card Bottom Meta & Actions */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {formatDate(item.createdAt)}
-                          </span>
+                          {/* Status Badge (Shopify Style) */}
+                          <td className="px-4 py-3">
+                            {item.type === 'video' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Published
+                              </span>
+                            ) : item.type === 'audio' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                Audio Stem
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                Resource
+                              </span>
+                            )}
+                          </td>
 
-                          <div className="flex items-center gap-1">
-                            {item.type === 'audio' && (
+                          {/* Actions Kebab Menu */}
+                          <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                            <div className="relative inline-block text-left">
                               <button
                                 type="button"
-                                onClick={(e) => handleToggleAudioPlay(item, e)}
-                                className={`p-1.5 rounded-lg transition-all ${
-                                  isAudioPlaying
-                                    ? 'text-purple-600 bg-purple-50'
-                                    : 'text-slate-400 hover:text-purple-600 hover:bg-purple-50'
-                                }`}
-                                title={isAudioPlaying ? 'Pause audio' : 'Play audio directly on card'}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === `tbl-${item.id}` ? null : `tbl-${item.id}`);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+                                title="More actions"
                               >
-                                {isAudioPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                <MoreVertical className="w-4 h-4" />
                               </button>
-                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => handleCopyLink(item)}
-                              className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                              title="Copy URL"
-                            >
-                              {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                            <a
-                              href={item.url || item.videoUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                              title="Open direct link"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(item)}
-                              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-                              title="Edit metadata"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(item)}
-                              disabled={isDeleting}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
-                              title="Delete asset"
-                            >
-                              {isDeleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                              {openMenuId === `tbl-${item.id}` && (
+                                <div
+                                  onClick={e => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-44 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleCopyLink(item);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="w-full px-3 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"
+                                  >
+                                    {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                    <span>Copy URL</span>
+                                  </button>
+
+                                  <a
+                                    href={item.url || item.videoUrl}
+                                    download
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setOpenMenuId(null)}
+                                    className="w-full px-3 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"
+                                  >
+                                    <Download className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Download</span>
+                                  </a>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleOpenEditModal(item);
+                                      setOpenMenuId(null);
+                                    }}
+                                    className="w-full px-3 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Edit Details</span>
+                                  </button>
+
+                                  <div className="my-1 border-t border-slate-100" />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDelete(item);
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={isDeleting}
+                                    className="w-full px-3 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 disabled:opacity-50"
+                                  >
+                                    {isDeleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                    <span>Delete Asset</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              {/* Grid Pagination Controls */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>
-                    Showing <span className="font-bold text-slate-800">{filteredItems.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1}</span> to{' '}
-                    <span className="font-bold text-slate-800">{Math.min(safeCurrentPage * pageSize, filteredItems.length)}</span> of{' '}
-                    <span className="font-bold text-slate-800">{filteredItems.length.toLocaleString()}</span> items
-                  </span>
-                  
-                  <div className="flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-3">
-                    <span className="text-[11px] text-slate-400">Show:</span>
-                    <select
-                      value={pageSize}
-                      onChange={e => setPageSize(Number(e.target.value))}
-                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    >
-                      <option value={24}>24</option>
-                      <option value={48}>48</option>
-                      <option value={96}>96</option>
-                      <option value={240}>240</option>
-                      <option value={10000}>All</option>
-                    </select>
-                  </div>
+              {/* Table Pagination */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-100 bg-slate-50/40">
+                <div className="text-xs text-slate-500 font-medium">
+                  Showing <span className="font-bold text-slate-800">{(safeCurrentPage - 1) * pageSize + 1}</span> to{' '}
+                  <span className="font-bold text-slate-800">{Math.min(safeCurrentPage * pageSize, filteredItems.length)}</span> of{' '}
+                  <span className="font-bold text-slate-800">{filteredItems.length.toLocaleString()}</span> products
                 </div>
 
                 {totalPages > 1 && (
@@ -875,7 +944,7 @@ export default function MediaUploadSection() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={safeCurrentPage <= 1}
-                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none font-bold transition-all shadow-2xs"
+                      className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-2xs"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
@@ -894,8 +963,8 @@ export default function MediaUploadSection() {
                             onClick={() => setCurrentPage(pageNum)}
                             className={`w-7 h-7 rounded-xl text-xs font-bold transition-all ${
                               safeCurrentPage === pageNum
-                                ? 'bg-purple-600 text-white shadow-xs'
-                                : 'text-slate-600 hover:bg-slate-100'
+                                ? 'bg-slate-900 text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                             }`}
                           >
                             {pageNum}
@@ -907,7 +976,7 @@ export default function MediaUploadSection() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                       disabled={safeCurrentPage >= totalPages}
-                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none font-bold transition-all shadow-2xs"
+                      className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-2xs"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
@@ -916,219 +985,133 @@ export default function MediaUploadSection() {
               </div>
             </div>
           ) : (
-            /* ─ Studio Table Mode ─ */
+            /* ─ Studio Grid Mode ─ */
             <div className="space-y-6 w-full">
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden w-full">
-                <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/50">
-                        <th className="px-5 py-3.5 w-10">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 w-full">
+                {paginatedItems.map(item => {
+                  const meta = TYPE_CONFIG[item.type] || TYPE_CONFIG.video;
+                  const thumb = getMediaThumbnail(item);
+                  const formatBadge = getFormatBadge(item.url || item.videoUrl || '', item.type);
+                  const isSelected = selectedIds.has(item.id);
+                  const isAudioPlaying = playingAudioId === item.id;
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setPreviewItem(item)}
+                      className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden group flex flex-col relative cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-500 ring-2 ring-indigo-200 shadow-md'
+                          : isAudioPlaying
+                          ? 'border-amber-400 ring-2 ring-amber-100 shadow-lg'
+                          : 'border-slate-200/80 hover:border-indigo-400 hover:shadow-lg hover:-translate-y-0.5'
+                      }`}
+                    >
+                      {/* Media Card Thumbnail Stage */}
+                      <div className="relative h-40 bg-slate-900 flex items-center justify-center overflow-hidden shrink-0">
+                        {thumb ? (
+                          <>
+                            <img
+                              src={thumb}
+                              alt={item.title}
+                              loading="lazy"
+                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                          </>
+                        ) : item.type === 'video' ? (
+                          <div className="w-full h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex flex-col items-center justify-center text-white/80 p-4">
+                            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-indigo-300 mb-1.5 group-hover:scale-110 transition-transform">
+                              <FileVideo className="w-5 h-5" />
+                            </div>
+                            <span className="text-[10px] font-bold text-white/70 tracking-wide uppercase">Video Stream</span>
+                          </div>
+                        ) : item.type === 'audio' ? (
+                          <div className="w-full h-full bg-gradient-to-br from-amber-950 via-slate-900 to-amber-900/50 flex flex-col items-center justify-center text-white/80 p-4">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 backdrop-blur-md flex items-center justify-center text-amber-300 mb-1.5 group-hover:scale-110 transition-transform">
+                              <FileAudio className="w-5 h-5" />
+                            </div>
+                            <span className="text-[10px] font-bold text-amber-300/80 tracking-wide uppercase">Audio Stem</span>
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <FileImage className="w-6 h-6" />
+                          </div>
+                        )}
+
+                        {/* Top Badges */}
+                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none z-10">
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-black tracking-wider bg-black/60 text-white/90 backdrop-blur-md border border-white/10 uppercase">
+                            {formatBadge}
+                          </span>
+
                           <button
                             type="button"
-                            onClick={toggleSelectAll}
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                              allSelected ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-300'
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleSelectItem(item.id);
+                            }}
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all pointer-events-auto shadow-xs ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-white/90 backdrop-blur-xs text-slate-400 opacity-0 group-hover:opacity-100 hover:text-indigo-600'
                             }`}
                           >
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
                           </button>
-                        </th>
-                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-wider">Asset Title</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-wider hidden sm:table-cell">Type</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-wider hidden lg:table-cell">Direct URL</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-wider hidden md:table-cell">Uploaded</th>
-                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {paginatedItems.map(item => {
-                        const meta = TYPE_CONFIG[item.type] || TYPE_CONFIG.video;
-                        const Icon = meta.icon;
-                        const isImg = item.type === 'image' || Boolean(item.url?.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i)) || Boolean(item.url?.includes('/image/upload/'));
-                        const isYt = Boolean(item.url?.includes('youtube.com') || item.url?.includes('youtu.be'));
-                        const thumb = item.thumbnail || (isImg ? (item.url || item.videoUrl) : isYt ? getYouTubeThumbnail(item.url) : null);
-                        const isSelected = selectedIds.has(item.id);
-                        const isAudioPlaying = playingAudioId === item.id;
-                        const isDeleting = deletingId === item.id;
+                        </div>
+                      </div>
 
-                        return (
-                          <tr
-                            key={item.id}
-                            className={`hover:bg-slate-50/80 transition-colors group ${
-                              isSelected ? 'bg-purple-50/40' : isAudioPlaying ? 'bg-purple-50/20' : ''
-                            }`}
-                          >
-                            <td className="px-5 py-3">
-                              <button
-                                type="button"
-                                onClick={() => toggleSelectItem(item.id)}
-                                className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                                  isSelected ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-300'
-                                }`}
-                              >
-                                <Check className="w-2.5 h-2.5 stroke-[3]" />
-                              </button>
-                            </td>
-
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-3">
-                                {/* Play trigger / preview thumb */}
-                                {item.type === 'audio' ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleToggleAudioPlay(item, e)}
-                                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform active:scale-95 ${
-                                      isAudioPlaying ? 'bg-purple-600 text-white animate-pulse' : `${meta.bg} ${meta.color}`
-                                    }`}
-                                    title={isAudioPlaying ? 'Pause audio' : 'Play audio'}
-                                  >
-                                    {isAudioPlaying ? (
-                                      <Pause className="w-4 h-4 fill-current" />
-                                    ) : (
-                                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                                    )}
-                                  </button>
-                                ) : thumb ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewItem(item)}
-                                    className="w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-slate-200 hover:opacity-80 transition-opacity"
-                                  >
-                                    <img src={thumb} alt={item.title} className="w-full h-full object-cover" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewItem(item)}
-                                    className={`w-9 h-9 rounded-xl ${meta.bg} flex items-center justify-center shrink-0 transition-transform active:scale-95`}
-                                  >
-                                    <Icon className={`w-4 h-4 ${meta.color}`} />
-                                  </button>
-                                )}
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-slate-900 truncate max-w-[240px]">{item.title}</p>
-                                  {item.description && (
-                                    <p className="text-[10px] text-slate-400 truncate max-w-[240px]">{item.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="px-5 py-3 hidden sm:table-cell">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold ${meta.bg} ${meta.color}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-                                {meta.label}
-                              </span>
-                            </td>
-
-                            <td className="px-5 py-3 hidden lg:table-cell">
-                              <a
-                                href={item.url || item.videoUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] text-slate-400 hover:text-purple-600 flex items-center gap-1 max-w-[200px] truncate"
-                              >
-                                <ExternalLink className="w-3 h-3 shrink-0" />
-                                <span className="truncate">{item.url || item.videoUrl}</span>
-                              </a>
-                            </td>
-
-                          <td className="px-5 py-3 hidden md:table-cell">
-                            <span className="text-[10px] text-slate-400">{formatDate(item.createdAt)}</span>
-                          </td>
-
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyLink(item)}
-                                className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                                title="Copy URL"
-                              >
-                                {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(item)}
-                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-                                title="Edit"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(item)}
-                                disabled={isDeleting}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
-                                title="Delete"
-                              >
-                                {isDeleting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Table Pagination Controls */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>
-                    Showing <span className="font-bold text-slate-800">{filteredItems.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1}</span> to{' '}
-                    <span className="font-bold text-slate-800">{Math.min(safeCurrentPage * pageSize, filteredItems.length)}</span> of{' '}
-                    <span className="font-bold text-slate-800">{filteredItems.length.toLocaleString()}</span> items
-                  </span>
-                  
-                  <div className="flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-3">
-                    <span className="text-[11px] text-slate-400">Show:</span>
-                    <select
-                      value={pageSize}
-                      onChange={e => setPageSize(Number(e.target.value))}
-                      className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    >
-                      <option value={24}>24</option>
-                      <option value={48}>48</option>
-                      <option value={96}>96</option>
-                      <option value={240}>240</option>
-                      <option value={10000}>All ({filteredItems.length})</option>
-                    </select>
-                  </div>
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={safeCurrentPage <= 1}
-                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-all"
-                      title="Previous Page"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-
-                    <span className="text-xs font-bold text-slate-700 px-2">
-                      Page {safeCurrentPage} of {totalPages}
-                    </span>
-
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={safeCurrentPage >= totalPages}
-                      className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-all"
-                      title="Next Page"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                      {/* Card Content */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-indigo-600 transition-colors" title={item.title}>
+                            {item.title}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                            {formatDate(item.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
         </div>
+
+        {/* ── 5. FLOATING BOTTOM SELECTION DOCK (Dribbble Style) ── */}
+        {selectedIds.size > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur-md rounded-2xl shadow-2xl border border-slate-800 px-4 py-2.5 flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-200">
+            <span className="text-xs font-bold bg-indigo-600 px-2.5 py-1 rounded-xl">
+              {selectedIds.size} Selected
+            </span>
+            <div className="h-4 w-px bg-slate-700" />
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 transition-all"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-400" />
+              <span>Export</span>
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 px-2 py-1 rounded-lg hover:bg-rose-950/50 transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Delete</span>
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1 text-slate-400 hover:text-white rounded-lg ml-1"
+              title="Clear selection"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* ── 4. FULL STANDARD STUDIO MODAL (ADD / EDIT) ── */}
         {showModal && (
@@ -1295,81 +1278,105 @@ export default function MediaUploadSection() {
 
         {/* ── 5. FULL PREVIEW PLAYER MODAL (VIDEO / AUDIO / IMAGE) ── */}
         {previewItem && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[600] flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-slate-900 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[600] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+            <div className="bg-slate-900 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col max-h-[92vh]">
               {/* Header */}
-              <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-white shrink-0">
-                <div className="flex items-center gap-3">
-                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-400/30 uppercase tracking-wider">
+              <div className="p-4 sm:p-5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between text-white shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-400/30 uppercase tracking-wider shrink-0">
                     {previewItem.type}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-white/10 text-white/80 uppercase tracking-wider shrink-0">
+                    {getFormatBadge(previewItem.url || previewItem.videoUrl || '', previewItem.type)}
                   </span>
                   <h3 className="text-sm font-bold text-white truncate max-w-md">{previewItem.title}</h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPreviewItem(null)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={previewItem.url || previewItem.videoUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-bold"
+                    title="Download original file"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Download</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewItem(null)}
+                    className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Player Stage */}
-              <div className="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[350px]">
+              <div className="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[380px] relative">
                 {previewItem.type === 'video' && getYouTubeId(previewItem.url || previewItem.videoUrl || '') ? (
                   <iframe
                     src={`https://www.youtube.com/embed/${getYouTubeId(previewItem.url || previewItem.videoUrl || '')}?autoplay=1`}
                     title={previewItem.title}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    className="w-full h-full min-h-[400px] border-0"
+                    className="w-full h-full min-h-[440px] border-0"
                   />
                 ) : previewItem.type === 'video' ? (
                   <video
                     src={previewItem.url || previewItem.videoUrl}
                     controls
                     autoPlay
-                    className="w-full max-h-[500px]"
+                    playsInline
+                    className="w-full max-h-[540px] bg-black"
                   />
                 ) : previewItem.type === 'audio' ? (
-                  <div className="p-10 text-center space-y-5 w-full max-w-md">
-                    <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
-                      <FileAudio className="w-8 h-8" />
+                  <div className="p-8 sm:p-12 text-center space-y-6 w-full max-w-lg">
+                    <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400 shadow-xl">
+                      <FileAudio className="w-10 h-10" />
                     </div>
-                    <h4 className="text-sm font-bold text-white">{previewItem.title}</h4>
-                    <audio
-                      src={previewItem.url || previewItem.videoUrl}
-                      controls
-                      autoPlay
-                      className="w-full"
-                    />
+                    <div>
+                      <h4 className="text-base font-black text-white">{previewItem.title}</h4>
+                      {previewItem.description && (
+                        <p className="text-xs text-slate-400 mt-1">{previewItem.description}</p>
+                      )}
+                    </div>
+                    <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-inner">
+                      <audio
+                        src={previewItem.url || previewItem.videoUrl}
+                        controls
+                        autoPlay
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <img
                     src={previewItem.url}
                     alt={previewItem.title}
-                    className="max-h-[500px] object-contain mx-auto"
+                    className="max-h-[540px] object-contain mx-auto"
                   />
                 )}
               </div>
 
               {/* Footer Actions */}
               <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
-                <span className="truncate max-w-sm">{previewItem.url}</span>
+                <span className="truncate max-w-sm font-mono text-[11px] text-slate-500">{previewItem.url}</span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleCopyLink(previewItem)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all active:scale-95"
                   >
                     {copiedId === previewItem.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    Copy Link
+                    Copy URL
                   </button>
                   <a
                     href={previewItem.url || previewItem.videoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-all"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-all shadow-md shadow-purple-950 active:scale-95"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     Open Source

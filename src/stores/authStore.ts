@@ -388,12 +388,12 @@ export const useAuthStore = create<AuthState>()(
           }
         })
         .catch((err) => {
-          clearProfileCache();
           if (err instanceof SessionExpiredError || (err as any)?.status === 401 || (err as any)?.status === 403) {
+            clearProfileCache();
             set({ user: null, profile: null, loading: false, backendOffline: false });
           } else {
-            console.warn('[AuthStore] API check error:', err);
-            set({ user: null, profile: null, loading: false, backendOffline: false });
+            console.warn('[AuthStore] API check error, maintaining cached session:', err);
+            set({ loading: false, backendOffline: true });
           }
         })
         .finally(() => {

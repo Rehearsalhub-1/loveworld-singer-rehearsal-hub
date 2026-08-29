@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/stores/authStore';
@@ -112,6 +112,17 @@ function saveStoredMembers(list: Member[]) {
   } catch {}
 }
 
+function friendlyMemberError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error || '');
+  if (!msg) return 'Something went wrong. Please try again.';
+  const lower = msg.toLowerCase();
+  if (lower.includes('not found') || lower.includes('404')) return 'Member not found. They may have already been removed.';
+  if (lower.includes('forbidden') || lower.includes('403')) return "You don't have permission to perform this action.";
+  if (lower.includes('network') || lower.includes('fetch')) return 'Connection failed. Check your internet and try again.';
+  if (msg.length > 80 || msg.includes('_') || msg.includes('prisma')) return 'Something went wrong. Please try again.';
+  return msg;
+}
+
 export default function Members() {
   const { user } = useAuth();
   const { currentZone } = useZone();
@@ -138,6 +149,7 @@ export default function Members() {
   const [allZones, setAllZones] = useState<any[]>([]);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+  const [rejectModal, setRejectModal] = useState<{ member: Member | null; reason: string }>({ member: null, reason: '' });
   const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -161,7 +173,7 @@ export default function Members() {
   // Data loading from live API directory (with stale-while-revalidate)
   const loadMembers = async (forceRefresh = false) => {
     const effectiveZoneId = filterZone !== 'all' ? filterZone : selectedZoneId;
-    const effectiveIsGlobal = effectiveZoneId === 'all';
+    const effectiveIsGlobal = (filterZone === 'all' && isGlobalView) || effectiveZoneId === 'all' || effectiveZoneId === 'zone-001';
     const cacheKey = getCacheKey(isChurchScope ? `church_${selectedChurchId}` : effectiveZoneId, filterZone);
 
     if (forceRefresh) {
@@ -185,10 +197,10 @@ export default function Members() {
       } else if (effectiveIsGlobal) {
         query = '/profiles/directory';
       } else {
-        query = `/profiles/directory?zone_code=${encodeURIComponent(selectedZone?.invitationCode || effectiveZoneId)}`;
+        query = `/profiles/directory?zone_code=${encodeURIComponent((selectedZone as any)?.code || selectedZone?.invitationCode || effectiveZoneId)}`;
       }
-      const res = await apiClient.get<{ success: boolean; data: any[] }>(query);
-      const rawList = res?.data || [];
+      const res = await apiClient.get<any>(query);
+      const rawList = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
 
       if (rawList.length > 0) {
         const membersData: Member[] = rawList.map((m: any) => {
@@ -249,6 +261,17 @@ export default function Members() {
   };
 
   useEffect(() => {
+    // Clear ALL cache entries for previous zones when the active zone changes.
+    // This prevents stale data from a previous zone being shown briefly
+    // while the new zone's data loads. The current zone's entries will be
+    // re-populated by loadMembers below.
+    membersCache.forEach((_entry, key) => {
+      const keyZone = key.split('_')[0];
+      const effectiveZone = isChurchScope ? `church_${selectedChurchId}` : (selectedZoneId || 'all');
+      if (keyZone !== effectiveZone) {
+        membersCache.delete(key);
+      }
+    });
     loadMembers(false);
     setDisplayLimit(50);
   }, [selectedZoneId, filterZone]);
@@ -403,7 +426,7 @@ export default function Members() {
       showToast(`${member.first_name}'s account suspended`, 'info');
       setSelectedMember(null);
     } catch (err: any) {
-      showToast(err.message || 'Failed to suspend member', 'error');
+      showToast(friendlyMemberError(err) || 'Failed to suspend member', 'error');
     } finally {
       setLoading(false);
     }
@@ -418,7 +441,7 @@ export default function Members() {
       showToast(`${member.first_name} has been banned`, 'error');
       setSelectedMember(null);
     } catch (err: any) {
-      showToast(err.message || 'Failed to ban member', 'error');
+      showToast(friendlyMemberError(err) || 'Failed to ban member', 'error');
     } finally {
       setLoading(false);
     }
@@ -432,7 +455,7 @@ export default function Members() {
       showToast(`${member.first_name}'s account reactivated ✓`, 'success');
       setSelectedMember(null);
     } catch (err: any) {
-      showToast(err.message || 'Failed to reactivate member', 'error');
+      showToast(friendlyMemberError(err) || 'Failed to reactivate member', 'error');
     } finally {
       setLoading(false);
     }
@@ -449,7 +472,7 @@ export default function Members() {
       setSelectedMember(null);
       showToast(`${member.first_name} ${member.last_name} deleted successfully`, 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete member', 'error');
+      showToast(friendlyMemberError(err) || 'Failed to delete member', 'error');
     } finally {
       setLoading(false);
     }
@@ -478,10 +501,17 @@ export default function Members() {
   };
 
   const handleRejectRequest = async (member: Member) => {
-    const reason = window.prompt(`Reason for rejecting ${member.first_name} ${member.last_name}'s request (leave blank to skip):`);
-    if (reason === null) return; // cancelled
+    // Open the rejection reason modal instead of using window.prompt
+    setRejectModal({ member, reason: '' });
+  };
+
+  const confirmRejectRequest = async () => {
+    const member = rejectModal.member;
+    if (!member) return;
+    const reason = rejectModal.reason.trim();
+    setRejectModal({ member: null, reason: '' });
     try {
-      await apiClient.post(`/profiles/${encodeURIComponent(member.id)}/reject`, { reason: reason.trim() });
+      await apiClient.post(`/profiles/${encodeURIComponent(member.id)}/reject`, { reason });
       setMembers(prev => prev.filter(m => m.id !== member.id));
       showToast(`${member.first_name}'s request has been rejected`, 'info');
       setSelectedMember(null);
@@ -504,6 +534,48 @@ export default function Members() {
         </div>
       )}
 
+      {/* Reject Reason Modal */}
+      {rejectModal.member && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center">
+                <UserX className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Reject Join Request</h3>
+                <p className="text-xs text-slate-500">{rejectModal.member.first_name} {rejectModal.member.last_name}</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1.5">Reason (optional)</label>
+              <textarea
+                value={rejectModal.reason}
+                onChange={e => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder="Leave blank to decline without a reason..."
+                rows={3}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRejectModal({ member: null, reason: '' })}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRejectRequest}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Reject Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Glassmorphic Command Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -512,7 +584,7 @@ export default function Members() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Personnel Directory</h1>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Members</h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
                 {members.length} Singers Registered
               </span>
@@ -522,7 +594,7 @@ export default function Members() {
                 </span>
               )}
             </div>
-            <p className="text-xs font-medium text-slate-400 mt-0.5">Manage user credentials, roles, aliases, and granular feature visibility</p>
+            <p className="text-xs font-medium text-slate-400 mt-0.5">Manage roles, credentials, and feature access.</p>
           </div>
         </div>
 
@@ -1042,16 +1114,19 @@ function MemberManagementDrawer({
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const isPendingApproval = !!((member as any).rawData?.pending_hq_approval || (member as any).raw_data?.pending_hq_approval);
 
   const initialHidden = (member.hiddenFeatures || (member as any).hidden_features || {}) as Record<string, boolean>;
   const isSpecialMemberInitial = member.role === 'admin' || member.role === 'boss' || member.role === 'hq_admin';
   const hasArchiveInitial = !!(member as any).can_access_archive || !!(member as any).has_hq_access || isSpecialMemberInitial;
+  const hasPreRehearsalInitial = !!(member as any).can_access_pre_rehearsal || !!(member as any).canAccessPreRehearsal;
+  const hasAnnotateInitial = !!(member as any).canAnnotate || !!(member as any).can_annotate || !!(member as any).canUseAnnotation;
 
   const [hiddenFeatures, setHiddenFeatures] = useState<Record<string, boolean>>({
     hideOngoing: !!initialHidden.hideOngoing,
-    hidePreRehearsal: initialHidden.hidePreRehearsal !== undefined ? !!initialHidden.hidePreRehearsal : false,
+    hidePreRehearsal: initialHidden.hidePreRehearsal !== undefined ? !!initialHidden.hidePreRehearsal : !hasPreRehearsalInitial,
     hideArchives: initialHidden.hideArchives !== undefined ? !!initialHidden.hideArchives : !hasArchiveInitial,
     hideAudioLab: !!initialHidden.hideAudioLab,
     hideLexicon: !!initialHidden.hideLexicon,
@@ -1060,7 +1135,7 @@ function MemberManagementDrawer({
     hideHistory: !!initialHidden.hideHistory,
     hideMinisteredSongs: !!initialHidden.hideMinisteredSongs,
     hideWarmups: !!initialHidden.hideWarmups,
-    hideAnnotations: initialHidden.hideAnnotations !== undefined ? !!initialHidden.hideAnnotations : !isSpecialMemberInitial,
+    hideAnnotations: initialHidden.hideAnnotations !== undefined ? !!initialHidden.hideAnnotations : !hasAnnotateInitial,
   });
 
   const [editForm, setEditForm] = useState<Partial<Member>>({ ...member });
@@ -1076,10 +1151,12 @@ function MemberManagementDrawer({
     const h = (member.hiddenFeatures || (member as any).hidden_features || raw.hiddenFeatures || raw.hidden_features || {}) as Record<string, boolean>;
     const isSpecialMember = member.role === 'admin' || member.role === 'boss' || member.role === 'hq_admin';
     const hasArchive = !!(member as any).can_access_archive || !!raw.can_access_archive || !!(member as any).has_hq_access || !!raw.has_hq_access || isSpecialMember;
+    const hasPreRehearsal = !!(member as any).can_access_pre_rehearsal || !!raw.can_access_pre_rehearsal || !!raw.canAccessPreRehearsal;
+    const hasAnnotate = !!(member as any).canAnnotate || !!raw.canAnnotate || !!raw.can_annotate || !!raw.canUseAnnotation;
 
     setHiddenFeatures({
       hideOngoing: !!h.hideOngoing,
-      hidePreRehearsal: h.hidePreRehearsal !== undefined ? !!h.hidePreRehearsal : false,
+      hidePreRehearsal: h.hidePreRehearsal !== undefined ? !!h.hidePreRehearsal : !hasPreRehearsal,
       hideArchives: h.hideArchives !== undefined ? !!h.hideArchives : !hasArchive,
       hideAudioLab: !!h.hideAudioLab,
       hideLexicon: !!h.hideLexicon,
@@ -1088,10 +1165,11 @@ function MemberManagementDrawer({
       hideHistory: !!h.hideHistory,
       hideMinisteredSongs: !!h.hideMinisteredSongs,
       hideWarmups: !!h.hideWarmups,
-      hideAnnotations: h.hideAnnotations !== undefined ? !!h.hideAnnotations : !isSpecialMember,
+      hideAnnotations: h.hideAnnotations !== undefined ? !!h.hideAnnotations : !hasAnnotate,
     });
     setEditForm({ ...member });
     setNewPassword('');
+    setIsDirty(false);
   }, [member]);
 
   const handleSave = async () => {
@@ -1112,6 +1190,8 @@ function MemberManagementDrawer({
         has_hq_access: editForm.has_hq_access || editForm.role === 'hq_admin',
         can_access_archive: !hiddenFeatures.hideArchives,
         can_access_pre_rehearsal: !hiddenFeatures.hidePreRehearsal,
+        canAnnotate: !hiddenFeatures.hideAnnotations,
+        can_annotate: !hiddenFeatures.hideAnnotations,
         zone_code: editForm.zoneId || (editForm as any).zone_code,
         hidden_features: hiddenFeatures,
       };
@@ -1139,6 +1219,7 @@ function MemberManagementDrawer({
       setSelectedMember(updatedMember);
       setIsEditing(false);
       setNewPassword('');
+      setIsDirty(false);
       showToast('Profile, credentials, and visibility saved successfully', 'success');
     } catch (error: any) {
       console.error('Error updating member:', error);
@@ -1153,9 +1234,14 @@ function MemberManagementDrawer({
 
     const nextHidden = { ...hiddenFeatures, [featureKey]: !hiddenFeatures[featureKey] };
     setHiddenFeatures(nextHidden);
+    setIsDirty(true);
     try {
       await apiClient.patch(`/profiles/${encodeURIComponent(member.id)}`, {
         hidden_features: nextHidden,
+        can_access_archive: !nextHidden.hideArchives,
+        can_access_pre_rehearsal: !nextHidden.hidePreRehearsal,
+        canAnnotate: !nextHidden.hideAnnotations,
+        can_annotate: !nextHidden.hideAnnotations,
       });
       const updated = { ...member, hiddenFeatures: nextHidden };
       setMembers(prev => prev.map(m => m.id === member.id ? updated : m));
@@ -1170,107 +1256,79 @@ function MemberManagementDrawer({
 
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={() => {
+        if (isDirty && !window.confirm('You have unsaved changes. Close without saving?')) return;
+        onClose();
+      }} />
 
       <div className="absolute inset-y-0 right-0 max-w-full flex">
         <div className="w-screen max-w-md lg:max-w-lg bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 sticky top-0 z-10">
             <div className="flex items-center gap-3">
               <button
-                onClick={onClose}
+                onClick={() => {
+                  if (isDirty && !window.confirm('You have unsaved changes. Close without saving?')) return;
+                  onClose();
+                }}
                 className="p-2 hover:bg-slate-200/70 rounded-2xl transition-colors text-slate-400 hover:text-slate-700"
               >
                 <X className="w-5 h-5" />
               </button>
               <div>
-                <h3 className="text-base font-black text-slate-900">Personnel Management</h3>
-                <p className="text-xs text-slate-400">ID: {member.id.substring(0, 10)}...</p>
+                <h3 className="text-sm font-black text-slate-900">Member Profile & Access</h3>
+                <p className="text-[11px] text-slate-400">ID: {member.id.substring(0, 10)}...</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {!isEditing ? (
-                <button
-                  onClick={() => canEditMemberDetails && setIsEditing(true)}
-                  disabled={!canEditMemberDetails}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md shadow-indigo-200 active:scale-95 flex items-center gap-1.5"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  Edit Profile
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditForm({ ...member });
-                      setNewPassword('');
-                    }}
-                    className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl transition-all shadow-md shadow-indigo-200 active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
-                  >
-                    {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Save Changes'}
-                  </button>
-                </div>
-              )}
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                member.is_active !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {member.is_active !== false ? '● Active' : '● Inactive'}
+              </span>
             </div>
           </div>
 
-          {/* Profile Overview Card */}
-          <div className="p-6 text-center border-b border-slate-100 bg-white">
-            <div className="relative inline-block mb-3">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-indigo-200 overflow-hidden">
+          {/* Scrollable Single-View Content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {/* 👤 Hero Identity Overview */}
+            <div className="p-5 rounded-3xl bg-slate-50 border border-slate-100 flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-md shadow-indigo-200 overflow-hidden flex-shrink-0">
                 {member.profile_image_url ? (
                   <img src={member.profile_image_url} alt="" className="w-full h-full object-cover" />
                 ) : (
                   `${member.first_name?.[0] || 'M'}${member.last_name?.[0] || ''}`.toUpperCase()
                 )}
               </div>
-              {member.is_active && (
-                <span className="w-4 h-4 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-1 -right-1" />
-              )}
-            </div>
-
-            <h4 className="text-xl font-black text-slate-900 mb-0.5">
-              {member.first_name} {member.last_name}
-            </h4>
-            <p className="text-xs font-semibold text-slate-500 mb-3">{member.email}</p>
-
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <span className="px-3 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-700">
-                {member.zoneName || 'Global HQ'}
-              </span>
-              {member.alias && (
-                <span className="px-3 py-1 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200">
-                  @{member.alias}
-                </span>
-              )}
-              {member.role === 'hq_admin' && (
-                <span className="px-3 py-1 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200">
-                  HQ Admin
-                </span>
-              )}
+              <div className="flex-1 min-w-0">
+                <h4 className="text-base font-black text-slate-900 truncate">
+                  {editForm.first_name || member.first_name} {editForm.last_name || member.last_name}
+                </h4>
+                <p className="text-xs text-slate-500 truncate">{editForm.email || member.email}</p>
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    {editForm.zoneName || member.zoneName || 'HQ Umbrella'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/70 text-slate-700">
+                    {editForm.role === 'hq_admin' ? '👑 HQ Admin' : editForm.role === 'church_coordinator' ? '⛪ Church Coordinator' : '🎤 Choir Member'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Pending Approval Alert inside Drawer */}
             {isPendingApproval && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-left">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-3xl flex items-center justify-between gap-3 text-left">
                 <div>
                   <p className="text-xs font-black text-amber-900">Awaiting HQ Approval</p>
-                  <p className="text-[10px] text-amber-700">Requested Zone: {(member as any).rawData?.zone_code || member.zoneId || 'HQ'}</p>
+                  <p className="text-[11px] text-amber-700">Requested Zone: {(member as any).rawData?.zone_code || member.zoneId || 'HQ'}</p>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   {onApprove && (
                     <button
                       onClick={() => onApprove(member)}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
                     >
                       Approve
                     </button>
@@ -1278,7 +1336,7 @@ function MemberManagementDrawer({
                   {onReject && (
                     <button
                       onClick={() => onReject(member)}
-                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-all"
+                      className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
                     >
                       Reject
                     </button>
@@ -1286,275 +1344,238 @@ function MemberManagementDrawer({
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex p-2 gap-1 bg-slate-50/70 border-b border-slate-100">
-            {[
-              { id: 'profile', label: 'Identity & Details', icon: <Building2 className="w-3.5 h-3.5" /> },
-              { id: 'credentials', label: 'Credentials & Role', icon: <KeyRound className="w-3.5 h-3.5" /> },
-              { id: 'visibility', label: 'Feature Matrix', icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-white text-purple-700 shadow-sm border border-slate-100'
-                    : 'text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            {/* 📋 Section 1: Identity & Group Assignment */}
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-indigo-600" />
+                <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider">1. Identity & Assignment</h5>
+              </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-            {/* Tab 1: Profile & Identity */}
-            {activeTab === 'profile' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">First Name</label>
-                    <input
-                      type="text"
-                      disabled={!isEditing}
-                      value={editForm.first_name || ''}
-                      onChange={e => setEditForm(p => ({ ...p, first_name: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden disabled:bg-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Last Name</label>
-                    <input
-                      type="text"
-                      disabled={!isEditing}
-                      value={editForm.last_name || ''}
-                      onChange={e => setEditForm(p => ({ ...p, last_name: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden disabled:bg-slate-100"
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={editForm.first_name || ''}
+                    onChange={e => { setEditForm(p => ({ ...p, first_name: e.target.value })); setIsDirty(true); }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
                 </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={editForm.last_name || ''}
+                    onChange={e => { setEditForm(p => ({ ...p, last_name: e.target.value })); setIsDirty(true); }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 mb-1">Primary Email</label>
                   <input
                     type="email"
-                    disabled={!isEditing}
                     value={editForm.email || ''}
-                    onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden disabled:bg-slate-100"
+                    onChange={e => { setEditForm(p => ({ ...p, email: e.target.value })); setIsDirty(true); }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   />
                 </div>
-
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 mb-1">Phone Number</label>
                   <input
                     type="tel"
-                    disabled={!isEditing}
                     value={editForm.phone || ''}
-                    onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden disabled:bg-slate-100"
+                    onChange={e => { setEditForm(p => ({ ...p, phone: e.target.value })); setIsDirty(true); }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Church Assembly</label>
-                    <input
-                      type="text"
-                      disabled={!isEditing}
-                      value={editForm.church || ''}
-                      onChange={e => setEditForm(p => ({ ...p, church: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden disabled:bg-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Designation</label>
-                    <input
-                      type="text"
-                      disabled={!isEditing}
-                      value={editForm.designation || ''}
-                      onChange={e => setEditForm(p => ({ ...p, designation: e.target.value }))}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden disabled:bg-slate-100"
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Church Assembly / City</label>
+                  <input
+                    type="text"
+                    value={editForm.church || ''}
+                    onChange={e => { setEditForm(p => ({ ...p, church: e.target.value })); setIsDirty(true); }}
+                    placeholder="e.g. Central Church"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Vocal Part / Designation</label>
+                  <input
+                    type="text"
+                    value={editForm.designation || ''}
+                    onChange={e => { setEditForm(p => ({ ...p, designation: e.target.value })); setIsDirty(true); }}
+                    placeholder="e.g. Soprano, Tenor, Band Lead"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
                 </div>
               </div>
-            )}
 
-            {/* Tab 2: Credentials & Role */}
-            {activeTab === 'credentials' && (
-              <div className="space-y-5">
-                {/* Login Username & Alias */}
-                <div className="space-y-3 p-4 rounded-3xl bg-slate-50 border border-slate-100">
-                  <h5 className="text-xs font-black text-slate-900">Login Alias & Handles</h5>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">System Username</label>
-                    <input
-                      type="text"
-                      disabled={!isEditing}
-                      value={editForm.username || ''}
-                      onChange={e => setEditForm(p => ({ ...p, username: e.target.value }))}
-                      placeholder="e.g. president, director"
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden disabled:bg-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Special Login Alias (@)</label>
-                    <input
-                      type="text"
-                      disabled={!isEditing}
-                      value={editForm.alias || ''}
-                      onChange={e => setEditForm(p => ({ ...p, alias: e.target.value }))}
-                      placeholder="e.g. president, director, oftp"
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden disabled:bg-slate-100"
-                    />
-                  </div>
-                </div>
-
-                {/* HQ Admin Password Reset */}
-                {isEditing && isHqUser && (
-                  <div className="p-4 rounded-3xl bg-amber-50 border border-amber-200 space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <KeyRound className="w-4 h-4 text-amber-700" />
-                      <h5 className="text-xs font-black text-amber-950">Reset Password (HQ Executive)</h5>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={showPass ? 'text' : 'password'}
-                        autoComplete="new-password"
-                        name="admin_new_password_no_autofill"
-                        id="admin_new_password_no_autofill"
-                        value={newPassword}
-                        onChange={e => setNewPassword(e.target.value)}
-                        placeholder="Enter new password to assign..."
-                        className="w-full px-3.5 pr-10 py-2.5 bg-white border border-amber-300 rounded-2xl text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPass(!showPass)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
-                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-amber-800">Leave empty if you don't want to reset their password.</p>
-                  </div>
-                )}
-
-                {/* Role Selector */}
-                {isEditing && isHqUser ? (
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Administrative Privilege Level</label>
-                    <select
-                      value={editForm.role || 'member'}
-                      onChange={e => setEditForm(p => ({
+              {/* HQ Sub-unit & Chapter Dropdown */}
+              {isHqUser && allZones && allZones.length > 0 && (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Assigned Organization / HQ Sub-Unit</label>
+                  <select
+                    value={editForm.zoneId || (editForm as any).zone_code || ''}
+                    onChange={e => {
+                      const newZoneCode = e.target.value;
+                      const matched = allZones.find(z => z.invitationCode === newZoneCode || z.id === newZoneCode);
+                      setEditForm(p => ({
                         ...p,
-                        role: e.target.value,
-                        has_hq_access: e.target.value === 'hq_admin' || e.target.value === 'super_admin'
-                      }))}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
-                    >
-                      <option value="member">Singer (Standard Portal Access)</option>
-                      <option value="church_coordinator">Church Coordinator (Subgroup / Assembly Lead)</option>
-                      <option value="zone_coordinator">Zonal Coordinator (Regional Zone Lead)</option>
-                      <option value="hq_admin">HQ Admin (Global Executive Access)</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-black text-slate-900">Current Role</p>
-                      <p className="text-[11px] text-slate-400 capitalize">{member.role || 'Singer'}</p>
-                    </div>
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700">
-                      {member.role === 'hq_admin' ? 'HQ Admin' : member.role === 'church_coordinator' ? 'Church Coordinator' : member.role === 'zone_admin' || member.role === 'zone_coordinator' ? 'Zonal Coordinator' : 'Choir Member'}
-                    </span>
-                  </div>
-                )}
+                        zoneId: newZoneCode,
+                        zoneName: matched?.name || newZoneCode
+                      }));
+                      setIsDirty(true);
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  >
+                    <optgroup label="🏢 Headquarters Umbrella (Shared HQ)">
+                      {allZones.filter(z => z.region === 'Headquarters' || z.id.startsWith('zone-00') || z.id.startsWith('zone-p') || z.id.startsWith('zone-orch') || z.id.startsWith('zone-dir') || z.id.startsWith('zone-of')).map(z => (
+                        <option key={z.id} value={z.invitationCode || z.id}>
+                          {z.id === 'zone-001' ? 'Your Loveworld Singers (HQ Core)' :
+                           z.id === 'zone-president' ? 'The President Zone (HQ)' :
+                           z.id === 'zone-director' ? 'The Director Zone (HQ)' :
+                           z.id === 'zone-005' ? 'Presidential Mass Choir (HQ)' :
+                           z.id === 'zone-orchestra' ? 'Loveworld Singers Orchestra (HQ)' :
+                           z.id === 'zone-002' ? 'Loveworld Singers 24 Worship Band (HQ)' :
+                           z.id === 'zone-004' ? 'Loveworld Singers Teens Choir (HQ)' :
+                           z.id === 'zone-oftp' ? 'OFTP Pastors Zone (HQ)' :
+                           z.name} ({z.invitationCode})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="🌍 Regional Churches & Chapters">
+                      {allZones.filter(z => z.region !== 'Headquarters' && !z.id.startsWith('zone-00') && !z.id.startsWith('zone-p') && !z.id.startsWith('zone-orch') && !z.id.startsWith('zone-dir') && !z.id.startsWith('zone-of') && z.id !== 'zone-boss').map(z => (
+                        <option key={z.id} value={z.invitationCode || z.id}>
+                          {z.name} ({z.invitationCode})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+              )}
 
-                {/* Zone Assignment / Change (HQ Admins) */}
-                {isEditing && isHqUser && allZones && allZones.length > 0 && (
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">Assigned Zone / Group</label>
-                    <select
-                      value={editForm.zoneId || (editForm as any).zone_code || ''}
-                      onChange={e => {
-                        const newZoneCode = e.target.value;
-                        const matched = allZones.find(z => z.invitationCode === newZoneCode || z.id === newZoneCode);
-                        setEditForm(p => ({
-                          ...p,
-                          zoneId: newZoneCode,
-                          zoneName: matched?.name || newZoneCode
-                        }));
-                      }}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
-                    >
-                      <optgroup label="Headquarters Groups">
-                        {allZones.filter(z => z.region === 'Headquarters' || z.id.startsWith('zone-00') || z.id.startsWith('zone-p') || z.id.startsWith('zone-orch') || z.id.startsWith('zone-dir') || z.id.startsWith('zone-of')).map(z => (
-                          <option key={z.id} value={z.invitationCode || z.id}>
-                            {z.name} ({z.invitationCode})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Regional Chapters">
-                        {allZones.filter(z => z.region !== 'Headquarters' && !z.id.startsWith('zone-00') && !z.id.startsWith('zone-p') && !z.id.startsWith('zone-orch') && !z.id.startsWith('zone-dir') && !z.id.startsWith('zone-of') && z.id !== 'zone-boss').map(z => (
-                          <option key={z.id} value={z.invitationCode || z.id}>
-                            {z.name} ({z.invitationCode})
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </div>
-                )}
+              {/* Privilege Role Selector */}
+              {isHqUser && (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Administrative Privilege Level</label>
+                  <select
+                    value={editForm.role || 'member'}
+                    onChange={e => { setEditForm(p => ({
+                      ...p,
+                      role: e.target.value,
+                      has_hq_access: e.target.value === 'hq_admin' || e.target.value === 'super_admin'
+                    })); setIsDirty(true); }}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  >
+                    <option value="member">Choir Member (Standard Singer Access)</option>
+                    <option value="church_coordinator">Church Coordinator (Local Church Scope)</option>
+                    <option value="zone_coordinator">Zonal Coordinator (Regional Zone Lead)</option>
+                    <option value="hq_admin">HQ Admin (Global Executive Access)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* 🔑 Section 2: Password & Credentials */}
+            <div className="space-y-3.5 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-indigo-600" />
+                <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider">2. Credentials & Password</h5>
               </div>
-            )}
 
-            {/* Tab 3: Feature Visibility Matrix */}
-            {activeTab === 'visibility' && (
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">System Username</label>
+                  <input
+                    type="text"
+                    value={editForm.username || ''}
+                    onChange={e => { setEditForm(p => ({ ...p, username: e.target.value })); setIsDirty(true); }}
+                    placeholder="e.g. president, director"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Login Alias (@)</label>
+                  <input
+                    type="text"
+                    value={editForm.alias || ''}
+                    onChange={e => { setEditForm(p => ({ ...p, alias: e.target.value })); setIsDirty(true); }}
+                    placeholder="e.g. president, director"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {isHqUser && (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Assign New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={e => { setNewPassword(e.target.value); setIsDirty(true); }}
+                      placeholder="Leave blank to keep current password..."
+                      className="w-full px-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass(!showPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 👑 Section 3: Administrative Controls (Web Studio) */}
+            {(editForm.role === 'hq_admin' || editForm.role === 'church_coordinator' || editForm.role === 'zone_coordinator' || editForm.role === 'admin') && (
+              <div className="space-y-3.5 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
-                  <h5 className="text-xs font-black text-slate-900">Module Access Controls</h5>
-                  <span className="text-[10px] font-bold text-slate-400">Toggle visibility per user</span>
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                    <h5 className="text-xs font-black text-amber-950 uppercase tracking-wider">3. Administrative Controls</h5>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md">
+                    {editForm.role === 'hq_admin' ? 'HQ Scope' : 'Local Church Scope'}
+                  </span>
                 </div>
 
-                <div className="p-4 rounded-3xl bg-slate-50 border border-slate-100 divide-y divide-slate-200/60">
+                <div className="rounded-2xl bg-amber-50/50 border border-amber-200/60 p-4 divide-y divide-amber-200/40">
                   {[
-                    { key: 'hideOngoing', title: 'Ongoing Programs', desc: 'Current scheduled praise nights & sets' },
-                    { key: 'hidePreRehearsal', title: 'Pre-Rehearsal Sets', desc: 'Advanced preview repertoire' },
-                    { key: 'hideArchives', title: 'Song & Program Archives', desc: 'Past ministered songs and programs' },
-                    { key: 'hideAudioLab', title: 'AudioLab & Player', desc: 'Multitrack vocal isolation studio' },
-                    { key: 'hideSubgroups', title: 'Choir Sub-Groups', desc: 'Zonal and local fellowship groups' },
-                    { key: 'hideLexicon', title: 'Lexicon AI Module', desc: 'Pronunciation and dictionary tools' },
-                    { key: 'hideSubmissions', title: 'Song Submissions', desc: 'Original ministered song submissions' },
-                    { key: 'hideHistory', title: 'Ministered History Songs', desc: 'Songs moved to past ministered history' },
-                    { key: 'hideMinisteredSongs', title: 'All Ministered Songs', desc: 'Master Library songs catalog' },
-                    { key: 'hideWarmups', title: 'Vocal Warm-ups', desc: 'Vocal exercises and breathing techniques' },
-                    { key: 'hideAnnotations', title: 'Song Annotations & Pen Tool', desc: 'Brush and doodle drawings on songs' },
-                  ].map(f => {
-                    const isHidden = hiddenFeatures[f.key];
+                    { key: 'canManageMasterLibrary', title: 'Master Song Library', desc: 'Add, arrange, and edit catalog songs' },
+                    { key: 'canManageMedia', title: 'Media & Stems Studio', desc: 'Upload and manage rehearsal stems & video streams' },
+                    { key: 'canManageSchedules', title: 'Schedule & Callouts', desc: 'Build rehearsal rosters and timelines' },
+                    { key: 'canManageMembers', title: 'Member Directory & Access', desc: 'Manage member credentials and feature matrix' },
+                    { key: 'canManageAttendance', title: 'Attendance & Check-in', desc: 'View live attendance and monitor rehearsal logs' },
+                  ].map(adm => {
+                    const isHidden = hiddenFeatures[`hideAdmin_${adm.key}`];
                     return (
-                      <div key={f.key} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                      <div key={adm.key} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-xs font-bold text-slate-900">{f.title}</p>
-                          <p className="text-[10px] text-slate-400">{isHidden ? 'Hidden for this user' : f.desc}</p>
+                          <p className="text-xs font-bold text-slate-900">{adm.title}</p>
+                          <p className="text-[10px] text-slate-500">{adm.desc}</p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleFeature(f.key)}
+                          onClick={() => toggleFeature(`hideAdmin_${adm.key}`)}
                           disabled={!canManageMemberFeatures}
-                          aria-disabled={!canManageMemberFeatures}
-                          title={canManageMemberFeatures ? `Toggle ${f.title}` : 'Feature visibility is read-only for this role'}
-                          className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${
-                            !isHidden ? 'bg-indigo-600' : 'bg-slate-300'
-                          } ${!canManageMemberFeatures ? 'cursor-not-allowed opacity-60' : ''}`}
+                          className={`w-6 h-6 rounded-lg transition-all flex items-center justify-center flex-shrink-0 border ${
+                            !isHidden
+                              ? 'bg-amber-600 border-amber-600 text-white shadow-xs'
+                              : 'bg-white border-slate-300 text-transparent hover:border-slate-400'
+                          } ${!canManageMemberFeatures ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                         >
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${
-                            !isHidden ? 'left-6' : 'left-1'
-                          }`} />
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
                         </button>
                       </div>
                     );
@@ -1562,6 +1583,94 @@ function MemberManagementDrawer({
                 </div>
               </div>
             )}
+
+            {/* 🎤 Section 4: Singer Repertoire & Features (Web + Mobile App) */}
+            <div className="space-y-3.5 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+                  <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider">4. Singer Repertoire & Features</h5>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                  Web & Mobile App
+                </span>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-4 divide-y divide-slate-200/60">
+                {[
+                  { key: 'hideOngoing', title: 'Ongoing Programs', desc: 'Current scheduled praise nights & live programs', isOffDefault: false },
+                  { key: 'hideAudioLab', title: 'AudioLab & Multitrack Player', desc: 'Vocal stem isolation (Soprano, Alto, Tenor, Bass, Band)', isOffDefault: false },
+                  { key: 'hideSubmissions', title: 'Song Submissions', desc: 'Original ministered song submissions', isOffDefault: false },
+                  { key: 'hideLexicon', title: 'Lexicon AI Module', desc: 'Pronunciation and lyrics glossary dictionary', isOffDefault: false },
+                  { key: 'hideWarmups', title: 'Vocal Warm-ups', desc: 'Breathing exercises and vocal routines', isOffDefault: false },
+                  { key: 'hideSubgroups', title: 'Choir Sub-Groups', desc: 'Choir departments and fellowship channels', isOffDefault: false },
+                  { key: 'hidePreRehearsal', title: 'Pre-Rehearsal Sets', desc: 'Upcoming Praise Night setlists (Off by default)', isOffDefault: true },
+                  { key: 'hideAnnotations', title: 'Song Annotations & Pen Tool', desc: 'Draw and highlight on song sheets (Off by default)', isOffDefault: true },
+                  { key: 'hideArchives', title: 'Song & Program Archives', desc: 'Past ministered songs and historical archives (Off by default)', isOffDefault: true },
+                ].map(f => {
+                  const isHidden = hiddenFeatures[f.key];
+                  return (
+                    <div key={f.key} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-slate-900">{f.title}</p>
+                          {f.isOffDefault && (
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-200/70 px-1.5 py-0.2 rounded">
+                              Restricted
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500">{f.desc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleFeature(f.key)}
+                        disabled={!canManageMemberFeatures}
+                        aria-disabled={!canManageMemberFeatures}
+                        title={canManageMemberFeatures ? `Toggle ${f.title}` : 'Feature visibility is read-only for this role'}
+                        className={`w-6 h-6 rounded-lg transition-all flex items-center justify-center flex-shrink-0 border ${
+                          !isHidden
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs'
+                            : 'bg-white border-slate-300 text-transparent hover:border-slate-400'
+                        } ${!canManageMemberFeatures ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 💾 Sticky Bottom Action Bar */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 sticky bottom-0 z-10">
+            <button
+              onClick={() => onRemoveFromZone(member)}
+              disabled={!canEditMemberDetails}
+              className="px-3.5 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-2xl transition-all cursor-pointer"
+            >
+              Remove
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (isDirty && !window.confirm('You have unsaved changes. Close without saving?')) return;
+                  onClose();
+                }}
+                className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-all cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={loading || !canEditMemberDetails}
+                className="px-6 py-2.5 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl transition-all shadow-md shadow-indigo-200 active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

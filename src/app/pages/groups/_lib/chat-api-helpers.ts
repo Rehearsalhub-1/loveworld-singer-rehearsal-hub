@@ -79,30 +79,43 @@ export async function apiFindMessage(
   return null
 }
 
-export async function apiGetProfile(userId: string): Promise<Record<string, unknown> | null> {
+function cleanUserId(input: unknown): string {
+  if (!input) return '';
+  if (typeof input === 'string') return input.trim();
+  if (typeof input === 'object') {
+    return ((input as any).id || (input as any).userId || (input as any).uid || '').trim();
+  }
+  return String(input).trim();
+}
+
+export async function apiGetProfile(userId: unknown): Promise<Record<string, unknown> | null> {
+  const uid = cleanUserId(userId);
+  if (!uid || uid === '[object Object]') return null;
   try {
     const res = await apiClient.get<ApiEnvelope<Record<string, unknown>>>(
-      `/profiles/${encodeURIComponent(userId)}`,
-    )
-    return res.data && typeof res.data === 'object' ? res.data : null
+      `/profiles/${encodeURIComponent(uid)}`,
+    );
+    return res.data && typeof res.data === 'object' ? res.data : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 export async function apiMembersByUser(
-  userId: string,
+  userId: unknown,
 ): Promise<{ zoneMembers: Record<string, unknown>[]; hqMembers: Record<string, unknown>[] }> {
+  const uid = cleanUserId(userId);
+  if (!uid || uid === '[object Object]') return { zoneMembers: [], hqMembers: [] };
   try {
     const res = await apiClient.get<
       ApiEnvelope<{ zoneMembers?: Record<string, unknown>[]; hqMembers?: Record<string, unknown>[] }>
-    >(`/members/by-user/${encodeURIComponent(userId)}`)
+    >(`/members/by-user/${encodeURIComponent(uid)}`);
     return {
       zoneMembers: Array.isArray(res.data?.zoneMembers) ? res.data.zoneMembers : [],
       hqMembers: Array.isArray(res.data?.hqMembers) ? res.data.hqMembers : [],
-    }
+    };
   } catch {
-    return { zoneMembers: [], hqMembers: [] }
+    return { zoneMembers: [], hqMembers: [] };
   }
 }
 
