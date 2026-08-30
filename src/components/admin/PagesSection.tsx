@@ -196,11 +196,10 @@ export default function PagesSection(props: PagesSectionProps) {
       return (selectedPage as any).songs;
     }
     if (allSongs.length > 0) {
-      const matching = allSongs.filter(song => {
+      return allSongs.filter(song => {
         const songPageId = song.praiseNightId || (song as any).praisenightid || (song as any).praisenight_id || (song as any).programId || (song as any).pageId;
         return !songPageId || songPageId === selectedPage.id || songPageId === selectedPage.id.toString();
       });
-      return matching.length > 0 ? matching : allSongs;
     }
     return [];
   }, [allSongs, selectedPage]);
@@ -369,8 +368,26 @@ export default function PagesSection(props: PagesSectionProps) {
         </div>
 
         {/* Scrollable Programs List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-          {filteredPages.slice(0, pagesDisplayLimit).map((page) => {
+        <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+          {(() => {
+            const limited = filteredPages.slice(0, pagesDisplayLimit);
+            // Group by year
+            const groups: { year: string; items: typeof limited }[] = [];
+            limited.forEach(page => {
+              const yr = page.date ? new Date(page.date).getFullYear().toString() : 'No Date';
+              const last = groups[groups.length - 1];
+              if (last && last.year === yr) { last.items.push(page); }
+              else { groups.push({ year: yr, items: [page] }); }
+            });
+            return groups.map(({ year, items }) => (
+              <div key={year} className="mb-3">
+                <div className="flex items-center gap-2 px-1 mb-1.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{year}</span>
+                  <div className="flex-1 h-px bg-slate-100" />
+                  <span className="text-[10px] font-bold text-slate-300">{items.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {items.map((page) => {
             const isSelected = selectedPage?.id === page.id;
             const isOngoing = page.category === 'ongoing';
             const isPreRehearsal = page.category === 'pre-rehearsal';
@@ -481,6 +498,10 @@ export default function PagesSection(props: PagesSectionProps) {
               </div>
             );
           })}
+                </div>
+              </div>
+            ));
+          })()}
 
           {filteredPages.length > pagesDisplayLimit && (
             <button
