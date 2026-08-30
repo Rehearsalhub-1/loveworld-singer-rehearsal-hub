@@ -7,7 +7,8 @@ import { Organization } from '@/types/organization';
 import { apiClient } from '@/lib/api-client';
 
 export default function OrganizationsSection() {
-  const { accessibleOrganizations, refreshOrganizations } = useOrganizationStore();
+  const { accessibleOrganizations, refreshOrganizations, isSuperAdmin, capabilities } = useOrganizationStore();
+  const isHQAdmin = isSuperAdmin || capabilities.canManagePlatform;
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,17 +110,19 @@ export default function OrganizationsSection() {
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-black text-slate-900 tracking-tight">Organizations</h1>
-            <p className="text-[11px] text-slate-400 font-medium">{organizations.length} total</p>
+            <h1 className="text-base font-black text-slate-900 tracking-tight">Zones</h1>
+            <p className="text-[11px] text-slate-400 font-medium">{organizations.length} zones</p>
           </div>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Organization</span>
-        </button>
+        {isHQAdmin && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Zone</span>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -128,7 +131,7 @@ export default function OrganizationsSection() {
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by name, code, region..."
+            placeholder="Search zones by name, code, region..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200/80 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-400 outline-none"
@@ -145,7 +148,7 @@ export default function OrganizationsSection() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center text-xs font-bold text-slate-400">
-            {searchQuery ? `No results for "${searchQuery}"` : 'No organizations yet'}
+            {searchQuery ? `No results for "${searchQuery}"` : 'No zones yet'}
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -181,13 +184,15 @@ export default function OrganizationsSection() {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => openEdit(org)}
-                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
-                  title="Edit"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
+                {isHQAdmin && (
+                  <button
+                    onClick={() => openEdit(org)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    title="Edit"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -197,7 +202,7 @@ export default function OrganizationsSection() {
       {/* Create Modal */}
       {showCreateModal && (
         <OrgModal
-          title="New Organization"
+          title="New Zone"
           name={name} setName={setName}
           code={code} setCode={setCode}
           region={region} setRegion={setRegion}
