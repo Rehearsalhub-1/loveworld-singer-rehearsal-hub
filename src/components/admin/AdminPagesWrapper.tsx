@@ -214,7 +214,7 @@ export function AdminPagesWrapper() {
 
   const handleEditPage = (page: PraiseNight) => {
     setEditingPage(page);
-    setNewPageName(page.name); setNewPageDate(page.date);
+    setNewPageName(page.name); setNewPageDate(page.date || '');
     setNewPageLocation(page.location || ''); setNewPageDescription('');
     setNewPageCategory(page.category as ProgramCategory);
     setNewPagePageCategory(page.pageCategory || '');

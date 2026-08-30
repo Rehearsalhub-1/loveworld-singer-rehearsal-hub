@@ -26,6 +26,7 @@ function getSectionFromPath(pathname: string): string {
   if (pathname.startsWith('/admin/calendar')) return 'Calendar';
   if (pathname.startsWith('/admin/master-library')) return 'All Ministered';
   if (pathname.startsWith('/admin/media')) return 'Media';
+  if (pathname.startsWith('/admin/karaoke-config')) return 'Playback Mode';
   if (pathname.startsWith('/admin/support-chat')) return 'Support';
   if (pathname.startsWith('/admin/activity-logs')) return 'Activity Logs';
   if (pathname.startsWith('/admin/schedule')) return 'Schedule';
@@ -117,8 +118,8 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       'Organizations': '/admin/organizations',
       'Page Categories': '/admin/pages',
       'Categories': '/admin/pages',
-      'Playback Mode': '/admin/pages',
-      'Karaoke Config': '/admin/pages',
+      'Playback Mode': '/admin/karaoke-config',
+      'Karaoke Config': '/admin/karaoke-config',
     };
     router.push(routeMap[section] ?? '/admin/dashboard');
     setSidebarOpen(false);

@@ -446,7 +446,7 @@ export default function EditPageModal({
           </button>
           <button
             type="button"
-            disabled={isSaving || !name.trim() || !date.trim() || !location.trim()}
+            disabled={isSaving || !name.trim() || !(date || '').trim() || !location.trim()}
             onClick={onSave}
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all shadow-sm active:scale-98"
           >

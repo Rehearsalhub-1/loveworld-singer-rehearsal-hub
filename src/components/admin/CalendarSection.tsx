@@ -8,6 +8,7 @@ import {
   Grid3x3, List, ChevronRight, Check, Image as ImageIcon, Save
 } from 'lucide-react';
 import { useZone } from '@/hooks/useZone';
+import { useOrganizationStore } from '@/stores/organizationStore';
 import CustomLoader from '@/components/CustomLoader';
 import { UpcomingEvent, UpcomingEventsService } from '@/app/pages/calendar/_lib/upcoming-events-service';
 import MediaSelectionModal from '../MediaSelectionModal';
@@ -24,6 +25,7 @@ const EVENT_TYPE_CONFIG = {
 
 export default function CalendarSection({ readOnly = false }: { readOnly?: boolean }) {
   const { currentZone } = useZone();
+  const { activeOrganizationId } = useOrganizationStore();
 
   // Data State
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
@@ -64,7 +66,7 @@ export default function CalendarSection({ readOnly = false }: { readOnly?: boole
   };
 
   const loadEvents = useCallback(async (isRefresh = false) => {
-    const zoneId = currentZone?.id || 'zone-001';
+    const zoneId = currentZone?.id || activeOrganizationId || '';
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
@@ -151,7 +153,7 @@ export default function CalendarSection({ readOnly = false }: { readOnly?: boole
 
     setSaving(true);
     try {
-      const zoneId = currentZone?.id || 'zone-001';
+      const zoneId = currentZone?.id || activeOrganizationId || '';
       if (editingEvent) {
         await UpcomingEventsService.updateEvent(editingEvent.id, formData, zoneId);
         showToast('success', 'Event schedule updated successfully!');
@@ -175,7 +177,7 @@ export default function CalendarSection({ readOnly = false }: { readOnly?: boole
   const handleToggleCarousel = async (event: UpcomingEvent) => {
     if (readOnly) return;
     try {
-      const zoneId = currentZone?.id || 'zone-001';
+      const zoneId = currentZone?.id || activeOrganizationId || '';
       await UpcomingEventsService.updateEvent(event.id, {
         showInCarousel: !event.showInCarousel
       }, zoneId);
@@ -190,7 +192,7 @@ export default function CalendarSection({ readOnly = false }: { readOnly?: boole
     if (readOnly) return;
     if (!eventToDelete) return;
     try {
-      const zoneId = currentZone?.id || 'zone-001';
+      const zoneId = currentZone?.id || activeOrganizationId || '';
       await UpcomingEventsService.deleteEvent(eventToDelete.id, zoneId);
       showToast('success', 'Event deleted from calendar.');
       setEvents(prev => prev.filter(e => e.id !== eventToDelete.id));

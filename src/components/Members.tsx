@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/stores/authStore';
@@ -7,6 +7,7 @@ import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { useZone } from '@/hooks/useZone';
 import { isHQGroup } from '@/config/zones';
 import { canPerformAdminAction, getAdminPermissions } from '@/config/admin-permissions';
+import { useOrganizationStore } from '@/stores/organizationStore';
 import CustomLoader from './CustomLoader';
 import {
   Users,
@@ -452,7 +453,7 @@ export default function Members() {
       setLoading(true);
       await apiClient.post(`/profiles/${encodeURIComponent(member.id)}/reactivate`, {});
       setMembers(prev => prev.map(m => m.id === member.id ? { ...m, is_active: true, status: 'active' } : m));
-      showToast(`${member.first_name}'s account reactivated ✓`, 'success');
+      showToast(`${member.first_name}'s account reactivated ?`, 'success');
       setSelectedMember(null);
     } catch (err: any) {
       showToast(friendlyMemberError(err) || 'Failed to reactivate member', 'error');
@@ -478,7 +479,7 @@ export default function Members() {
     }
   };
 
-  // Pending HQ requests — members with pending_hq_approval flag in rawData
+  // Pending HQ requests � members with pending_hq_approval flag in rawData
   const pendingMembers = useMemo(() => {
     return members.filter(m => {
       const raw = (m as any).rawData || (m as any).raw_data || {};
@@ -492,7 +493,7 @@ export default function Members() {
       const updatedRaw = { ...((member as any).rawData || {}), pending_hq_approval: false, is_active: true };
       const updated = { ...member, is_active: true, rawData: updatedRaw };
       setMembers(prev => prev.map(m => m.id === member.id ? updated : m));
-      showToast(`${member.first_name} ${member.last_name} approved ✓`, 'success');
+      showToast(`${member.first_name} ${member.last_name} approved ?`, 'success');
       setSelectedMember(null);
       membersCache.clear();
     } catch (err: any) {
@@ -1110,6 +1111,7 @@ function MemberManagementDrawer({
   allZones?: any[];
 }) {
   const { user: currentUser, profile: currentProfile } = useAuth();
+  const { capabilities: orgCapabilities, isSuperAdmin: orgIsSuperAdmin } = useOrganizationStore();
   const [activeTab, setActiveTab] = useState<'profile' | 'credentials' | 'visibility'>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1143,8 +1145,10 @@ function MemberManagementDrawer({
     currentProfile?.role || currentUser?.role,
     currentProfile?.hasHqAccess === true || (currentProfile as any)?.has_hq_access === true,
   );
-  const canEditMemberDetails = adminPermissions.canAccessAdmin;
-  const canManageMemberFeatures = adminPermissions.canAccessAdmin;
+  const canEditMemberDetails = adminPermissions.canAccessAdmin ||
+    orgCapabilities.canManageOrganization || orgCapabilities.canManagePlatform || orgIsSuperAdmin;
+  const canManageMemberFeatures = adminPermissions.canAccessAdmin ||
+    orgCapabilities.canManageOrganization || orgCapabilities.canManagePlatform || orgIsSuperAdmin;
 
   useEffect(() => {
     const raw = (member as any).rawData || {};
@@ -1285,14 +1289,14 @@ function MemberManagementDrawer({
               <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
                 member.is_active !== false ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'
               }`}>
-                {member.is_active !== false ? '● Active' : '● Inactive'}
+                {member.is_active !== false ? '? Active' : '? Inactive'}
               </span>
             </div>
           </div>
 
           {/* Scrollable Single-View Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-            {/* 👤 Hero Identity Overview */}
+            {/* ?? Hero Identity Overview */}
             <div className="p-5 rounded-3xl bg-slate-50 border border-slate-100 flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-md shadow-indigo-200 overflow-hidden flex-shrink-0">
                 {member.profile_image_url ? (
@@ -1311,7 +1315,7 @@ function MemberManagementDrawer({
                     {editForm.zoneName || member.zoneName || 'HQ Umbrella'}
                   </span>
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-200/70 text-slate-700">
-                    {editForm.role === 'hq_admin' ? '👑 HQ Admin' : editForm.role === 'church_coordinator' ? '⛪ Church Coordinator' : '🎤 Choir Member'}
+                    {editForm.role === 'hq_admin' ? '?? HQ Admin' : editForm.role === 'church_coordinator' ? '? Church Coordinator' : '?? Choir Member'}
                   </span>
                 </div>
               </div>
@@ -1345,7 +1349,7 @@ function MemberManagementDrawer({
               </div>
             )}
 
-            {/* 📋 Section 1: Identity & Group Assignment */}
+            {/* ?? Section 1: Identity & Group Assignment */}
             <div className="space-y-3.5">
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-indigo-600" />
@@ -1435,7 +1439,7 @@ function MemberManagementDrawer({
                     }}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   >
-                    <optgroup label="🏢 Headquarters Umbrella (Shared HQ)">
+                    <optgroup label="?? Headquarters Umbrella (Shared HQ)">
                       {allZones.filter(z => z.region === 'Headquarters' || z.id.startsWith('zone-00') || z.id.startsWith('zone-p') || z.id.startsWith('zone-orch') || z.id.startsWith('zone-dir') || z.id.startsWith('zone-of')).map(z => (
                         <option key={z.id} value={z.invitationCode || z.id}>
                           {z.id === 'zone-001' ? 'Your Loveworld Singers (HQ Core)' :
@@ -1450,7 +1454,7 @@ function MemberManagementDrawer({
                         </option>
                       ))}
                     </optgroup>
-                    <optgroup label="🌍 Regional Churches & Chapters">
+                    <optgroup label="?? Regional Churches & Chapters">
                       {allZones.filter(z => z.region !== 'Headquarters' && !z.id.startsWith('zone-00') && !z.id.startsWith('zone-p') && !z.id.startsWith('zone-orch') && !z.id.startsWith('zone-dir') && !z.id.startsWith('zone-of') && z.id !== 'zone-boss').map(z => (
                         <option key={z.id} value={z.invitationCode || z.id}>
                           {z.name} ({z.invitationCode})
@@ -1483,7 +1487,7 @@ function MemberManagementDrawer({
               )}
             </div>
 
-            {/* 🔑 Section 2: Password & Credentials */}
+            {/* ?? Section 2: Password & Credentials */}
             <div className="space-y-3.5 pt-2 border-t border-slate-100">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-indigo-600" />
@@ -1537,7 +1541,7 @@ function MemberManagementDrawer({
               )}
             </div>
 
-            {/* 👑 Section 3: Administrative Controls (Web Studio) */}
+            {/* ?? Section 3: Administrative Controls (Web Studio) */}
             {(editForm.role === 'hq_admin' || editForm.role === 'church_coordinator' || editForm.role === 'zone_coordinator' || editForm.role === 'admin') && (
               <div className="space-y-3.5 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
@@ -1584,7 +1588,7 @@ function MemberManagementDrawer({
               </div>
             )}
 
-            {/* 🎤 Section 4: Singer Repertoire & Features (Web + Mobile App) */}
+            {/* ?? Section 4: Singer Repertoire & Features (Web + Mobile App) */}
             <div className="space-y-3.5 pt-2 border-t border-slate-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1643,7 +1647,7 @@ function MemberManagementDrawer({
             </div>
           </div>
 
-          {/* 💾 Sticky Bottom Action Bar */}
+          {/* ?? Sticky Bottom Action Bar */}
           <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 sticky bottom-0 z-10">
             <button
               onClick={() => onRemoveFromZone(member)}
