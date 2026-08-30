@@ -5,12 +5,6 @@ import { Building2 } from 'lucide-react';
 import { useOrganizationStore } from '@/stores/organizationStore';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 
-/**
- * AdminScopeDisplay — used ONLY in the admin portal header.
- * Shows the admin locked org as a non-clickable label.
- * No org switching in admin — admin is locked to their ONE admin org.
- * Only shows church/subgroup switcher for managing sub-orgs.
- */
 export default function AdminScopeDisplay() {
   const { activeOrganization, activeSubgroup, accessibleSubgroups, capabilities, isSuperAdmin, switchSubgroup } = useOrganizationStore();
   const { isHQAdmin } = useAdminZone();
@@ -20,7 +14,6 @@ export default function AdminScopeDisplay() {
 
   return (
     <div className="flex items-center gap-2">
-      {/* Locked admin org — display only, NOT clickable */}
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80">
         <div className="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
           <Building2 className="w-3 h-3" />
@@ -42,7 +35,6 @@ export default function AdminScopeDisplay() {
         )}
       </div>
 
-      {/* Church/Subgroup switcher — admin manages which church scope they view */}
       {showSubgroupSwitcher && (
         <select
           value={activeSubgroup?.id || ''}
