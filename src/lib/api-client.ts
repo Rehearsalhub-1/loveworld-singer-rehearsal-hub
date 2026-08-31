@@ -254,6 +254,7 @@ async function request<T>(
     const res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
+      credentials: 'include',
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
 
@@ -269,6 +270,7 @@ async function request<T>(
           const retryRes = await fetch(`${BASE_URL}${path}`, {
             method,
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${newToken}`, ...headers },
+            credentials: 'include',
             ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
           });
           if (retryRes.status !== 401) {
