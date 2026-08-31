@@ -115,12 +115,14 @@ interface AuthState {
 
 function setSessionCookie() {
   if (typeof document === 'undefined') return
-  document.cookie = 'lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax'
+  const securePart = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = `lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax${securePart}`
 }
 
 function clearSessionCookie() {
   if (typeof document === 'undefined') return
-  document.cookie = 'lwsrh_is_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  const securePart = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = `lwsrh_is_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${securePart}`
 }
 
 // Profile caching

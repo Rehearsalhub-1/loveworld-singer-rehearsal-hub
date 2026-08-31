@@ -171,7 +171,8 @@ function AuthPageContent() {
           }
         }
         if (typeof window !== 'undefined') {
-          document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
+          const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax${securePart}`;
           localStorage.setItem('lwsrh_has_user', 'true');
           localStorage.setItem('userAuthenticated', 'true');
           localStorage.setItem('authProvider', 'kingschat');
@@ -251,7 +252,8 @@ function AuthPageContent() {
           }
         }
         if (typeof window !== 'undefined') {
-          document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
+          const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax${securePart}`;
           localStorage.setItem('lwsrh_has_user', 'true');
           localStorage.setItem('userAuthenticated', 'true');
           localStorage.setItem('authProvider', 'kingschat');
@@ -307,7 +309,8 @@ function AuthPageContent() {
           }
         }
         if (typeof window !== 'undefined') {
-          document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
+          const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax${securePart}`;
           localStorage.setItem('lwsrh_has_user', 'true');
           localStorage.setItem('userAuthenticated', 'true');
         }
@@ -371,7 +374,8 @@ function AuthPageContent() {
         if (res.data) {
           apiClient.setAccessToken(res.data.accessToken, res.data.refreshToken);
           if (typeof window !== 'undefined') {
-            document.cookie = "lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax";
+            const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = `lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax${securePart}`;
             localStorage.setItem('lwsrh_has_user', 'true');
             localStorage.setItem('userAuthenticated', 'true');
           }

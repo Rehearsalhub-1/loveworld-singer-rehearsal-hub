@@ -23,15 +23,21 @@ function getAccessToken(): string | null {
 
 function setSessionCookies(accessToken: string): void {
   if (typeof document === 'undefined') return;
+  const isSecureContext = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const securePart = isSecureContext ? '; Secure' : '';
+
   // Readable by Next middleware for route + role gates (persisted for 30 days)
-  document.cookie = `lwsrh_jwt=${accessToken}; path=/; max-age=2592000; SameSite=Lax`;
-  document.cookie = 'lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax';
+  document.cookie = `lwsrh_jwt=${accessToken}; path=/; max-age=2592000; SameSite=Lax${securePart}`;
+  document.cookie = `lwsrh_is_logged_in=true; path=/; max-age=31536000; SameSite=Lax${securePart}`;
 }
 
 function clearSessionCookies(): void {
   if (typeof document === 'undefined') return;
-  document.cookie = 'lwsrh_jwt=; path=/; max-age=0; SameSite=Lax';
-  document.cookie = 'lwsrh_is_logged_in=; path=/; max-age=0; SameSite=Lax';
+  const isSecureContext = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const securePart = isSecureContext ? '; Secure' : '';
+
+  document.cookie = `lwsrh_jwt=; path=/; max-age=0; SameSite=Lax${securePart}`;
+  document.cookie = `lwsrh_is_logged_in=; path=/; max-age=0; SameSite=Lax${securePart}`;
 }
 
 function getRefreshToken(): string | null {
