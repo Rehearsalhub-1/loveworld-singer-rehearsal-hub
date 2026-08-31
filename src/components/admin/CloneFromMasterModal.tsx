@@ -97,8 +97,8 @@ export default function CloneFromMasterModal({
               <Music className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Clone from Master Library</h2>
-              <p className="text-sm text-slate-500">Select a song to add to this Praise Night</p>
+              <h2 className="text-xl font-bold text-slate-900">Clone from All Ministered</h2>
+              <p className="text-sm text-slate-500">Select a song to add to this Program</p>
             </div>
           </div>
           <button
@@ -126,7 +126,7 @@ export default function CloneFromMasterModal({
           {loading ? (
             <div className="flex flex-col flex-1 items-center justify-center p-12 h-64">
               <CustomLoader />
-              <p className="mt-4 text-sm text-slate-500 font-medium">Loading master library...</p>
+              <p className="mt-4 text-sm text-slate-500 font-medium">Loading songs...</p>
             </div>
           ) : filteredSongs.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-center h-64">

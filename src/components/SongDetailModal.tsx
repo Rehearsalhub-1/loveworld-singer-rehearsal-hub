@@ -139,14 +139,21 @@ export default function SongDetailModal({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const loadHistoryEntries = useCallback(async () => {
-    if (!selectedSong?.id) {
+    const sid = selectedSong?.id;
+    const pid = (selectedSong as any)?.programId || (selectedSong as any)?.program_id || (selectedSong as any)?.praiseNightId || (selectedSong as any)?.praise_night_id;
+    if (!sid) {
       setHistoryEntries([]);
       return;
     }
     setIsLoadingHistory(true);
     try {
+      const params = new URLSearchParams();
+      params.append('songId', sid);
+      if (pid) params.append('programId', String(pid));
+      if (selectedSong?.title) params.append('title', selectedSong.title);
+
       const res = await apiClient.get<{ success: boolean; data: HistoryEntry[] }>(
-        `/songs/history?songId=${encodeURIComponent(selectedSong.id)}`
+        `/songs/history?${params.toString()}`
       );
       if (res?.success && Array.isArray(res?.data)) {
         setHistoryEntries(res.data);
@@ -159,7 +166,7 @@ export default function SongDetailModal({
     } finally {
       setIsLoadingHistory(false);
     }
-  }, [selectedSong?.id]);
+  }, [selectedSong?.id, (selectedSong as any)?.programId, (selectedSong as any)?.program_id, (selectedSong as any)?.praiseNightId, (selectedSong as any)?.praise_night_id, selectedSong?.title]);
 
   useEffect(() => {
     if (isOpen && selectedSong?.id) {

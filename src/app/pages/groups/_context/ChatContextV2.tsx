@@ -566,16 +566,37 @@ export function ChatProviderV2({ children }: { children: React.ReactNode }) {
     }
 
     const currentUserId = user?.uid || (user as any)?.id || ''
+    const currentUserName = ((user as any)?.displayName || (user as any)?.name || (profile as any)?.first_name ? `${(profile as any)?.first_name} ${(profile as any)?.last_name || ''}`.trim() : '').toLowerCase()
+
+    // 1. Direct chat: Check other participant's details
     const otherId = chat.participants.find(id => id && id !== currentUserId)
     if (otherId && chat.participantDetails?.[otherId]?.name) {
-      return chat.participantDetails[otherId].name
+      const otherName = chat.participantDetails[otherId].name
+      if (otherName && otherName !== 'Member' && otherName !== 'You') return otherName
     }
     if (otherId && (chat as any).participantNames?.[otherId]) {
-      return (chat as any).participantNames[otherId]
+      const otherName = (chat as any).participantNames[otherId]
+      if (otherName && otherName !== 'Member') return otherName
     }
 
-    if (chat.name && chat.name !== 'Direct Message' && chat.name !== 'Direct Chat') {
+    // 2. Parse comma-separated names if present (e.g. "ERIC STEPHEN, Member")
+    if (chat.name && chat.name !== 'Direct Message' && chat.name !== 'Direct Chat' && chat.name !== 'Chat') {
+      if (chat.name.includes(',')) {
+        const parts = chat.name.split(',').map(s => s.trim()).filter(Boolean)
+        const nonMeParts = parts.filter(p => {
+          const pLower = p.toLowerCase()
+          return (!currentUserName || !pLower.includes(currentUserName)) && pLower !== 'member'
+        })
+        if (nonMeParts.length > 0) return nonMeParts[0]
+
+        const remaining = parts.filter(p => !currentUserName || !p.toLowerCase().includes(currentUserName))
+        if (remaining.length > 0) return remaining[0]
+      }
       return chat.name
+    }
+
+    if (otherId && chat.participantDetails?.[otherId]?.name) {
+      return chat.participantDetails[otherId].name
     }
 
     if (otherId) {
@@ -583,7 +604,7 @@ export function ChatProviderV2({ children }: { children: React.ReactNode }) {
     }
 
     return 'Direct Message'
-  }, [user?.uid, (user as any)?.id])
+  }, [user?.uid, (user as any)?.id, (user as any)?.displayName, (user as any)?.name, (profile as any)?.first_name, (profile as any)?.last_name])
 
   const getChatAvatar = useCallback((chat: Chat) => {
     if (!chat) return undefined

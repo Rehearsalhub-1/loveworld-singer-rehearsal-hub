@@ -6,11 +6,8 @@ import { useOrganizationStore } from '@/stores/organizationStore';
 import { useAdminZone } from '@/contexts/AdminZoneContext';
 
 export default function AdminScopeDisplay() {
-  const { activeOrganization, activeSubgroup, accessibleSubgroups, capabilities, isSuperAdmin, switchSubgroup } = useOrganizationStore();
+  const { activeOrganization } = useOrganizationStore();
   const { isHQAdmin } = useAdminZone();
-
-  const canManageSubgroups = capabilities.canManageOrganization || capabilities.canManagePlatform || isSuperAdmin || capabilities.canManageSubgroup;
-  const showSubgroupSwitcher = canManageSubgroups && accessibleSubgroups.length > 0;
 
   return (
     <div className="flex items-center gap-2">
@@ -34,20 +31,6 @@ export default function AdminScopeDisplay() {
           </span>
         )}
       </div>
-
-      {showSubgroupSwitcher && (
-        <select
-          value={activeSubgroup?.id || ''}
-          onChange={(e) => switchSubgroup(e.target.value || null)}
-          className="text-xs font-bold bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:ring-2 focus:ring-indigo-400 cursor-pointer max-w-[160px]"
-          aria-label="Switch Church / Subgroup"
-        >
-          <option value="">All Churches</option>
-          {accessibleSubgroups.map((sg) => (
-            <option key={sg.id} value={sg.id}>{sg.name}</option>
-          ))}
-        </select>
-      )}
     </div>
   );
 }

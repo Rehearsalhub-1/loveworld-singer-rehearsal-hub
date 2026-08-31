@@ -42,7 +42,6 @@ export default function MasterLibrarySection({ isHQAdmin = false }: MasterLibrar
           stats={ml.stats}
           canManage={ml.canManage}
           setShowCreateModal={ml.setShowCreateModal}
-          setShowPublishModal={ml.setShowPublishModal}
           setShowCreateProgramModal={ml.setShowCreateProgramModal}
           setShowOrderProgramsModal={ml.setShowOrderProgramsModal}
         />
@@ -107,16 +106,6 @@ export default function MasterLibrarySection({ isHQAdmin = false }: MasterLibrar
 
         {/* Modals Orchestrator */}
         <MasterLibraryModals
-          showPublishModal={ml.showPublishModal}
-          setShowPublishModal={ml.setShowPublishModal}
-          availableForPublish={ml.availableForPublish}
-          selectedForPublish={ml.selectedForPublish}
-          setSelectedForPublish={ml.setSelectedForPublish}
-          handlePublish={ml.handlePublish}
-          publishing={ml.publishing}
-          isLoadingMore={ml.isLoadingMore}
-          hasMoreInternal={ml.hasMoreInternalSongs}
-          onLoadMoreInternal={ml.loadMoreInternalSongs}
           showImportModal={ml.showImportModal}
           setShowImportModal={ml.setShowImportModal}
           selectedSong={ml.selectedSong}

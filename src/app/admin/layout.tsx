@@ -1,14 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { AdminZoneProvider } from '@/contexts/AdminZoneContext';
 import { AdminThemeProvider } from '@/components/admin/AdminThemeProvider';
 import { PageLoader } from '@/components/PageLoader';
-import { useAuth } from '@/stores/authStore';
-import { useOrganizationStore } from '@/stores/organizationStore';
-import CustomLoader from '@/components/CustomLoader';
 
 const AdminSidebar = dynamic(() => import('@/components/admin/AdminSidebar'), { ssr: false });
 const AdminZoneHeader = dynamic(() => import('@/components/admin/AdminZoneHeader'), { ssr: false });
@@ -38,58 +35,14 @@ function getSectionFromPath(pathname: string): string {
 }
 
 function AdminShell({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
-  const { user, profile, isLoading: authLoading } = useAuth();
-  const { capabilities, isSuperAdmin } = useOrganizationStore();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   const activeSection = getSectionFromPath(pathname || '');
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push('/auth?redirect=/admin/dashboard');
-      return;
-    }
-    if (hasCheckedAuth) return;
-
-    const canAccess = Boolean(
-      isSuperAdmin ||
-      capabilities.canManagePlatform ||
-      capabilities.canManageOrganization ||
-      capabilities.canManageSubgroup ||
-      profile?.role === 'super_admin' ||
-      profile?.role === 'hq_admin' ||
-      profile?.role === 'admin' ||
-      profile?.role === 'boss' ||
-      profile?.role === 'zone_admin' ||
-      profile?.role === 'zone_coordinator' ||
-      profile?.role === 'coordinator' ||
-      profile?.role === 'subgroup_admin' ||
-      profile?.role === 'subgroup_coordinator' ||
-      profile?.role === 'church_coordinator' ||
-      profile?.hasHqAccess ||
-      (profile as any)?.has_hq_access
-    );
-
-    if (!canAccess) {
-      router.push('/home');
-      return;
-    }
-    setHasCheckedAuth(true);
-  }, [user, profile, authLoading, capabilities, isSuperAdmin, hasCheckedAuth, router]);
-
-  if (authLoading || (!hasCheckedAuth && !!user)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        <CustomLoader message="Loading Admin Console..." />
-      </div>
-    );
-  }
-
-  if (!user) return null;
+  // Access control is handled entirely by middleware.ts
+  // No duplicate check here — middleware already blocks non-admins at the edge
 
   const handleSectionChange = (section: string) => {
     const routeMap: Record<string, string> = {

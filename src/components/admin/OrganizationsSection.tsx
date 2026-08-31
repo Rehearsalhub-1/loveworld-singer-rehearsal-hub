@@ -187,7 +187,7 @@ export default function OrganizationsSection() {
                 {isHQAdmin && (
                   <button
                     onClick={() => openEdit(org)}
-                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all flex-shrink-0"
                     title="Edit"
                   >
                     <Edit2 className="w-4 h-4" />

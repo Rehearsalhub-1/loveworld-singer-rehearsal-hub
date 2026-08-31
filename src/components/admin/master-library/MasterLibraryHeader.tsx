@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Library, Music, Download, Plus, Upload, FolderPlus, ArrowUpDown, History, EyeOff } from 'lucide-react';
+import { Library, Music, Download, Plus, FolderPlus, ArrowUpDown, History, EyeOff } from 'lucide-react';
 import { MasterSong } from '@/lib/master-library';
 
 interface MasterLibraryHeaderProps {
@@ -15,7 +15,6 @@ interface MasterLibraryHeaderProps {
   };
   canManage: boolean;
   setShowCreateModal: (show: boolean) => void;
-  setShowPublishModal: (show: boolean) => void;
   setShowCreateProgramModal: (show: boolean) => void;
   setShowOrderProgramsModal: (show: boolean) => void;
 }
@@ -24,7 +23,6 @@ export const MasterLibraryHeader: React.FC<MasterLibraryHeaderProps> = ({
   stats,
   canManage,
   setShowCreateModal,
-  setShowPublishModal,
   setShowCreateProgramModal,
   setShowOrderProgramsModal,
 }) => {
@@ -89,13 +87,6 @@ export const MasterLibraryHeader: React.FC<MasterLibraryHeaderProps> = ({
             >
               <ArrowUpDown className="w-3.5 h-3.5 text-purple-600" />
               <span>Organize</span>
-            </button>
-            <button
-              onClick={() => setShowPublishModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80 rounded-xl transition-all font-bold text-xs active:scale-95 shadow-2xs"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import Internal</span>
             </button>
             <button
               onClick={() => setShowCreateModal(true)}

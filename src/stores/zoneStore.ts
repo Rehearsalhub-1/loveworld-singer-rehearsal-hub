@@ -223,10 +223,9 @@ export const useZoneStore = create<ZoneState>()(
             })
           } catch (error) {
             console.error('[ZoneStore] Error loading zones:', error)
-            const fallbackZone = ZONES[0]
             set({
-              currentZone: fallbackZone,
-              userZones: [fallbackZone],
+              currentZone: null,
+              userZones: [],
               userRole: 'zone_member',
               isLoading: false,
               isInitialized: true,
@@ -290,7 +289,14 @@ export const useZoneStore = create<ZoneState>()(
 
           try {
             const cleanCode = code.trim().toUpperCase()
-            const zone = getZoneByInvitationCode(cleanCode) || ZONES.find(z => z.invitationCode.toUpperCase() === cleanCode || z.id.toUpperCase() === cleanCode)
+            // Look up zone from DB via API
+            const dbOrgsRes = await apiClient.get<{ success: boolean; data: any[] }>('/organizations').catch(() => ({ success: false, data: [] as any[] }));
+            const allDbOrgs: any[] = Array.isArray(dbOrgsRes?.data) ? dbOrgsRes.data : [];
+            const zone = allDbOrgs.find((z: any) => 
+              (z.invitationCode || '').toUpperCase() === cleanCode || 
+              (z.code || '').toUpperCase() === cleanCode ||
+              z.id.toUpperCase() === cleanCode
+            );
             if (!zone) return { success: false, message: 'Invalid invitation code.' }
 
             const { userZones, refreshZones, switchZone } = get()

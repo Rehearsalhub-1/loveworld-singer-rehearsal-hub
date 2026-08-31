@@ -392,7 +392,7 @@ function GroupsContent() {
   }
 
   // Handle sending message moves to ChatWindow via context/props
-  const themeColor = currentZone?.themeColor || '#10b981'
+  const themeColor = currentZone?.themeColor || '#9333ea'
   const primaryColor = themeColor
 
   // Real data extraction for Media Grid

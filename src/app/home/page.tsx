@@ -303,9 +303,9 @@ function HomePageContent() {
                 <div className={`flex items-center justify-between px-3 sm:px-4 py-3 transition-all duration-300 ease-out ${isSearchOpen ? 'opacity-0' : 'opacity-100'
                   }`}>
                   {/* Left Section - Profile Picture & Zone Switcher */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     {/* Enhanced Profile Picture with iOS-style border */}
-                    <Link href="#" className="w-10 h-10 rounded-full overflow-hidden focus:outline-none focus:ring-0 transition-all duration-200 hover:scale-105 active:scale-95 flex-shrink-0">
+                    <Link href="#" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden focus:outline-none focus:ring-0 transition-all duration-200 hover:scale-105 active:scale-95 flex-shrink-0">
                       <div className="relative">
                         <img
                           src="/logo.png"
@@ -321,11 +321,11 @@ function HomePageContent() {
                     </Link>
 
                     {/* Organization Switcher */}
-                    <div data-tour="zone-switcher"><OrganizationSwitcher /></div>
+                    <div data-tour="zone-switcher" className="min-w-0 flex-1"><OrganizationSwitcher /></div>
                   </div>
 
                   {/* Right Section with iOS-style spacing */}
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-0.5 sm:space-x-1 shrink-0 ml-1 sm:ml-2">
                     {/* iOS-style Search Button */}
                     <button
                       onClick={() => setIsSearchOpen((v) => !v)}

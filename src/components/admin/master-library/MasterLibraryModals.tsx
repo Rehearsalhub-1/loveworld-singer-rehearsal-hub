@@ -2,25 +2,13 @@
 
 import React, { useState } from 'react';
 import {
-  X, Search, Check, Download, Upload, Music, Plus,
-  ArrowUpDown, Trash2, FolderPlus, Layers, Sparkles, AlertCircle
+  X, Search, Download, Music, Plus,
+  ArrowUpDown, Trash2, FolderPlus
 } from 'lucide-react';
 import { MasterSong, MasterProgram } from '@/lib/master-library';
 
 interface MasterLibraryModalsProps {
-  // Publish Modal
-  showPublishModal: boolean;
-  setShowPublishModal: (show: boolean) => void;
-  availableForPublish: any[];
-  selectedForPublish: string[];
-  setSelectedForPublish: (ids: string[]) => void;
-  handlePublish: () => void;
-  publishing: boolean;
-  isLoadingMore: boolean;
-  hasMoreInternal: boolean;
-  onLoadMoreInternal: () => void;
-
-  // Import Modal
+  // Import Modal (import master song into local zone)
   showImportModal: boolean;
   setShowImportModal: (show: boolean) => void;
   selectedSong: MasterSong | null;
@@ -42,13 +30,6 @@ interface MasterLibraryModalsProps {
 }
 
 export const MasterLibraryModals: React.FC<MasterLibraryModalsProps> = ({
-  showPublishModal,
-  setShowPublishModal,
-  availableForPublish = [],
-  selectedForPublish = [],
-  setSelectedForPublish,
-  handlePublish,
-  publishing,
   showImportModal,
   setShowImportModal,
   selectedSong,
@@ -70,7 +51,6 @@ export const MasterLibraryModals: React.FC<MasterLibraryModalsProps> = ({
   const [progDesc, setProgDesc] = useState('');
   const [reorderingPrograms, setReorderingPrograms] = useState<MasterProgram[]>(programs);
   const [creatingProg, setCreatingProg] = useState(false);
-  const [publishSearch, setPublishSearch] = useState('');
   const [programSearch, setProgramSearch] = useState('');
   const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null);
 
@@ -89,15 +69,6 @@ export const MasterLibraryModals: React.FC<MasterLibraryModalsProps> = ({
       setDeletingProgramId(null);
     }
   };
-
-  const filteredPublishSongs = availableForPublish.filter((song: any) => {
-    if (!publishSearch.trim()) return true;
-    const q = publishSearch.toLowerCase();
-    const title = String(song.title || '').toLowerCase();
-    const writer = String(song.writer || '').toLowerCase();
-    const singer = String(song.leadSinger || '').toLowerCase();
-    return title.includes(q) || writer.includes(q) || singer.includes(q);
-  });
 
   // Reorder helper
   const moveProgram = (index: number, direction: 'up' | 'down') => {
@@ -351,137 +322,6 @@ export const MasterLibraryModals: React.FC<MasterLibraryModalsProps> = ({
         </div>
       )}
 
-      {/* 3. Publish / Import from HQ Internal Modal */}
-      {showPublishModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[400] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-slate-100">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                  <Upload className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-900">Import from Internal Songs</h3>
-                  <p className="text-[11px] text-slate-400">Select internal repertoire songs to publish into the Master Library</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowPublishModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Search and Select-All Bar */}
-            <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search internal songs..."
-                  value={publishSearch}
-                  onChange={(e) => setPublishSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              {filteredPublishSongs.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedForPublish.length === filteredPublishSongs.length) {
-                      setSelectedForPublish([]);
-                    } else {
-                      setSelectedForPublish(filteredPublishSongs.map((s: any) => s.id));
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-white border border-slate-200 hover:border-purple-300 text-purple-700 rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0"
-                >
-                  {selectedForPublish.length === filteredPublishSongs.length ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-2">
-              {filteredPublishSongs.length === 0 ? (
-                <div className="text-center py-10">
-                  <Music className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-slate-600">No internal songs found</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    {publishSearch ? 'Try a different search query.' : 'All internal songs have already been imported.'}
-                  </p>
-                </div>
-              ) : (
-                filteredPublishSongs.map((song: any) => {
-                  const isSelected = selectedForPublish.includes(song.id);
-                  return (
-                    <div
-                      key={song.id}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedForPublish(selectedForPublish.filter(id => id !== song.id));
-                        } else {
-                          setSelectedForPublish([...selectedForPublish, song.id]);
-                        }
-                      }}
-                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                        isSelected
-                          ? 'bg-purple-50 border-purple-300 shadow-xs'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-3">
-                        <p className="text-xs font-bold text-slate-900 truncate">{song.title}</p>
-                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                          {song.leadSinger ? `Lead: ${song.leadSinger}` : ''}
-                          {song.leadSinger && song.writer ? ' • ' : ''}
-                          {song.writer ? `Written by ${song.writer}` : ''}
-                        </p>
-                      </div>
-
-                      <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 ${
-                        isSelected ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-300'
-                      }`}>
-                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <span className="text-xs font-bold text-purple-700">
-                {selectedForPublish.length} songs selected
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPublishModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={publishing || selectedForPublish.length === 0}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-200 disabled:opacity-50"
-                >
-                  {publishing ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Upload className="w-3.5 h-3.5" />
-                  )}
-                  <span>{publishing ? 'Importing...' : 'Import to Master'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 4. Import Master Song to Local Zone Modal */}
       {showImportModal && selectedSong && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[400] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -506,13 +346,13 @@ export const MasterLibraryModals: React.FC<MasterLibraryModalsProps> = ({
 
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Praise Night Set</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Program</label>
                 <select
                   value={selectedPraiseNight}
                   onChange={(e) => setSelectedPraiseNight(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800"
                 >
-                  <option value="">General Repertoire (No Set)</option>
+                  <option value="">General (No Program)</option>
                   {zonePraiseNights.map((pn: any) => (
                     <option key={pn.id} value={pn.id}>
                       {pn.name || `Praise Night ${pn.edition || ''}`}

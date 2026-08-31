@@ -3,6 +3,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { apiClient } from '@/lib/api-client';
+import { useOrganizationStore } from '@/stores/organizationStore';
+import { useAdminZone } from '@/contexts/AdminZoneContext';
 import { PraiseNight, PraiseNightSong, Category } from '@/types/supabase';
 import CustomLoader from '@/components/CustomLoader';
 import { uploadBannerImage } from '@/utils/imageUpload';
@@ -87,18 +89,30 @@ export function AdminPagesWrapper() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
+  // Scope context — must be declared before fetchPrograms callback
+  const { activeSubgroup } = useOrganizationStore();
+  const { selectedZoneId, isGlobalView, selectedChurchId } = useAdminZone();
+
   // Data fetching — isolated to this page
   const fetchPrograms = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get<any>('/programs').catch(() => null);
+      // Build query params to scope programs to the admin's current view
+      const params = new URLSearchParams();
+      if (selectedChurchId) {
+        params.set('subGroupId', selectedChurchId);
+      } else if (!isGlobalView && selectedZoneId && selectedZoneId !== 'all') {
+        params.set('zoneId', selectedZoneId);
+      }
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiClient.get<any>(`/programs${query}`).catch(() => null);
       setAllPraiseNights(Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
     } catch (e) {
       console.warn('[AdminPagesWrapper] fetchPrograms:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedZoneId, isGlobalView, selectedChurchId]);
 
   const fetchSongsForPage = useCallback(async (programId: string) => {
     try {
@@ -126,8 +140,13 @@ export function AdminPagesWrapper() {
     }
   }, []);
 
-  // On mount — fetch programs and categories once
-  useEffect(() => { fetchPrograms(); fetchCategories(); }, [fetchPrograms, fetchCategories]);
+  // On mount and when church scope changes — re-fetch programs
+  useEffect(() => {
+    fetchPrograms();
+    fetchCategories();
+    setSelectedPage(null);
+    setAllSongs([]);
+  }, [fetchPrograms, fetchCategories, activeSubgroup?.id, selectedZoneId, selectedChurchId]);
 
   // When selected page changes — clear stale songs immediately, then fetch fresh
   useEffect(() => {

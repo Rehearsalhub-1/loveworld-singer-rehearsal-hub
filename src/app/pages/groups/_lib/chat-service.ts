@@ -106,23 +106,37 @@ const TYPING_COLLECTION = 'typing_v2'
 
 function rowToChat(row: Record<string, any>): Chat {
   const raw = (row.rawData && typeof row.rawData === 'object') ? row.rawData as Record<string, any> : {}
-  const participants: string[] = Array.isArray(row.participants)
-    ? row.participants.map(String)
+  const extractUid = (item: any): string => {
+    if (!item) return ''
+    if (typeof item === 'string') return item
+    if (typeof item === 'object') return item.userId || item.id || item.uid || ''
+    return String(item)
+  }
+
+  const rawParticipants = Array.isArray(row.participants)
+    ? row.participants
     : Array.isArray(raw.participants)
-      ? raw.participants.map(String)
+      ? raw.participants
       : Array.isArray(row.memberIds)
-        ? row.memberIds.map(String)
+        ? row.memberIds
         : Array.isArray(raw.memberIds)
-          ? raw.memberIds.map(String)
-          : Array.isArray(row.member_ids)
-            ? row.member_ids.map(String)
-            : Array.isArray(raw.member_ids)
-              ? raw.member_ids.map(String)
-              : typeof row.participants === 'object' && row.participants !== null
-                ? Object.keys(row.participants)
-                : typeof raw.participants === 'object' && raw.participants !== null
-                  ? Object.keys(raw.participants)
-                  : []
+          ? raw.memberIds
+          : typeof row.participants === 'object' && row.participants !== null
+            ? Object.keys(row.participants)
+            : typeof raw.participants === 'object' && raw.participants !== null
+              ? Object.keys(raw.participants)
+              : []
+
+  const participants: string[] = rawParticipants.map(extractUid).filter(Boolean)
+
+  const idStr = String(row.id || '')
+  if (idStr.includes('_') && !idStr.startsWith('group_')) {
+    idStr.split('_').forEach(part => {
+      if (part && part.length >= 20 && !participants.includes(part)) {
+        participants.push(part)
+      }
+    })
+  }
 
   const participantDetails: Chat['participantDetails'] =
     (row.participantDetails && typeof row.participantDetails === 'object') ? { ...row.participantDetails } :

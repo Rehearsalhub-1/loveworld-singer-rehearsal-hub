@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { 
@@ -10,6 +10,8 @@ import {
   ArrowLeft, 
   Filter, 
   ChevronDown, 
+  ChevronLeft,
+  ChevronRight,
   X, 
   Volume2, 
   Music2,
@@ -28,14 +30,23 @@ export default function AllMinisteredSongsPage() {
   const { currentSong, isPlaying, setCurrentSong, play, pause } = useAudio();
 
   const [songs, setSongs] = useState<MasterSong[]>([]);
+  const [programs, setPrograms] = useState<MasterProgram[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalSongs, setTotalSongs] = useState(0);
+  const pageSize = 50;
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
   // Filters
   const [selectedLeadSinger, setSelectedLeadSinger] = useState<string>('all');
   const [selectedProgram, setSelectedProgram] = useState<string>('all');
   const [isSingerDropdownOpen, setIsSingerDropdownOpen] = useState(false);
   const [isProgramDropdownOpen, setIsProgramDropdownOpen] = useState(false);
+  const [programSearchQuery, setProgramSearchQuery] = useState('');
 
   // Feature Toggles from profile
   const hiddenFeatures = (profile as any)?.hidden_features || (profile as any)?.hiddenFeatures || {};
@@ -45,20 +56,36 @@ export default function AllMinisteredSongsPage() {
   const [selectedSong, setSelectedSong] = useState<PraiseNightSong | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  useEffect(() => {
-    async function loadMasterSongs() {
-      try {
-        setLoading(true);
-        const data = await MasterLibraryService.getMasterSongs();
-        setSongs(data || []);
-      } catch (err) {
-        console.error('Failed to load master songs:', err);
-      } finally {
-        setLoading(false);
-      }
+  const loadMasterData = useCallback(async (page: number, search: string) => {
+    try {
+      setLoading(true);
+      const [res, progs] = await Promise.all([
+        MasterLibraryService.getMasterSongs(page, pageSize, search),
+        MasterLibraryService.getPrograms(),
+      ]);
+      const songsList = Array.isArray(res) ? res : (res?.songs || []);
+      setSongs(songsList);
+      if (res && typeof res.totalPages === 'number') setTotalPages(res.totalPages);
+      if (res && typeof res.total === 'number') setTotalSongs(res.total);
+      if (progs && progs.length > 0) setPrograms(progs);
+    } catch (err) {
+      console.error('Failed to load master data:', err);
+    } finally {
+      setLoading(false);
     }
-    loadMasterSongs();
   }, []);
+
+  useEffect(() => {
+    loadMasterData(currentPage, searchTerm);
+  }, [currentPage, searchTerm, loadMasterData]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Filter out hidden drafts and optionally history
   const visibleSongs = useMemo(() => {
@@ -74,7 +101,7 @@ export default function AllMinisteredSongsPage() {
     });
   }, [songs, shouldHideHistory]);
 
-  // Extract unique lead singers & programs/categories from visible songs
+  // Extract unique lead singers from visible songs
   const leadSingers = useMemo(() => {
     const set = new Set<string>();
     visibleSongs.forEach(s => {
@@ -85,18 +112,12 @@ export default function AllMinisteredSongsPage() {
     return Array.from(set).sort();
   }, [visibleSongs]);
 
-  const programs = useMemo(() => {
-    const set = new Set<string>();
-    visibleSongs.forEach(s => {
-      if (s.category && typeof s.category === 'string' && s.category.trim()) {
-        set.add(s.category.trim());
-      }
-      if (Array.isArray(s.categories)) {
-        s.categories.forEach((c: string) => c && typeof c === 'string' && set.add(c.trim()));
-      }
-    });
-    return Array.from(set).sort();
-  }, [visibleSongs]);
+  // Filtered Programs for dropdown
+  const filteredProgramsList = useMemo(() => {
+    if (!programSearchQuery.trim()) return programs;
+    const q = programSearchQuery.toLowerCase().trim();
+    return programs.filter(p => (p.name || '').toLowerCase().includes(q));
+  }, [programs, programSearchQuery]);
 
   // Filtered Songs
   const filteredSongs = useMemo(() => {
@@ -120,14 +141,18 @@ export default function AllMinisteredSongsPage() {
     }
 
     if (selectedProgram !== 'all') {
-      result = result.filter(s =>
-        s.category === selectedProgram ||
-        (Array.isArray(s.categories) && s.categories.includes(selectedProgram))
-      );
+      const prog = programs.find(p => p.id === selectedProgram || p.name === selectedProgram);
+      result = result.filter(s => {
+        const inSongIds = prog?.songIds?.includes(s.id);
+        const inPraiseNightId = (s as any)?.praiseNightId === selectedProgram || (s as any)?.programId === selectedProgram || (prog && ((s as any)?.praiseNightId === prog.id || (s as any)?.programId === prog.id));
+        const inCategory = (prog && s.category === prog.name) || s.category === selectedProgram ||
+          (Array.isArray(s.categories) && (s.categories.includes(selectedProgram) || (prog && s.categories.includes(prog.name))));
+        return inSongIds || inPraiseNightId || inCategory;
+      });
     }
 
     return result;
-  }, [visibleSongs, searchTerm, selectedLeadSinger, selectedProgram]);
+  }, [visibleSongs, programs, searchTerm, selectedLeadSinger, selectedProgram]);
 
   const handleOpenSong = (song: MasterSong) => {
     const audioSrc = song.audioFile || (song.audioUrls ? Object.values(song.audioUrls)[0] : undefined);
@@ -179,10 +204,13 @@ export default function AllMinisteredSongsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-purple-600 selection:text-white pb-20">
+    <div
+      className="fixed inset-0 h-screen w-screen flex flex-col overflow-hidden bg-white text-slate-900 font-sans selection:bg-purple-600 selection:text-white"
+      style={{ height: '100dvh' }}
+    >
       
       {/* ── TOP HEADER BAR ── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 h-16 flex items-center justify-between">
+      <header className="flex-shrink-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 h-16 flex items-center justify-between">
         <button
           onClick={() => router.push('/pages/rehearsals')}
           className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 transition-colors active:scale-95"
@@ -207,13 +235,18 @@ export default function AllMinisteredSongsPage() {
         </div>
       </header>
 
-      {/* ── MAIN CONTENT ── */}
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+      {/* ── SCROLLABLE BODY CONTAINER ── */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-28">
         
         {/* Total Count */}
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            {songs.length > 0 ? `${filteredSongs.length} songs` : 'All Songs'}
+            {totalSongs > 0 ? `${totalSongs} songs` : songs.length > 0 ? `${filteredSongs.length} songs` : 'All Songs'}
           </h2>
         </div>
 
@@ -303,7 +336,7 @@ export default function AllMinisteredSongsPage() {
             )}
           </div>
 
-          {/* Programs Dropdown */}
+          {/* Collections / Programs Dropdown */}
           <div className="relative ml-auto">
             <button
               onClick={() => {
@@ -317,35 +350,52 @@ export default function AllMinisteredSongsPage() {
               }`}
             >
               <Music2 className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate max-w-[120px]">
-                {selectedProgram !== 'all' ? selectedProgram : 'Programs'}
+              <span className="truncate max-w-[130px]">
+                {selectedProgram !== 'all'
+                  ? (programs.find(p => p.id === selectedProgram || p.name === selectedProgram)?.name || selectedProgram)
+                  : 'Collections'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
             </button>
 
             {isProgramDropdownOpen && (
-              <div className="absolute top-12 right-0 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 max-h-64 overflow-y-auto no-scrollbar">
-                <button
-                  onClick={() => { setSelectedProgram('all'); setIsProgramDropdownOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-xs font-semibold flex items-center justify-between hover:bg-slate-50 ${
-                    selectedProgram === 'all' ? 'text-purple-600 font-bold bg-purple-50/50' : 'text-slate-700'
-                  }`}
-                >
-                  <span>All Programs & Categories</span>
-                  {selectedProgram === 'all' && <Check className="w-3.5 h-3.5 text-purple-600" />}
-                </button>
-                {programs.map(prog => (
+              <div className="absolute top-12 right-0 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 max-h-72 flex flex-col">
+                {/* Search collections bar */}
+                {programs.length > 8 && (
+                  <div className="px-3 pb-2 border-b border-slate-100">
+                    <input
+                      type="text"
+                      placeholder="Search collections..."
+                      value={programSearchQuery}
+                      onChange={(e) => setProgramSearchQuery(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    />
+                  </div>
+                )}
+
+                <div className="overflow-y-auto max-h-60 no-scrollbar py-1">
                   <button
-                    key={prog}
-                    onClick={() => { setSelectedProgram(prog); setIsProgramDropdownOpen(false); }}
+                    onClick={() => { setSelectedProgram('all'); setIsProgramDropdownOpen(false); setProgramSearchQuery(''); }}
                     className={`w-full text-left px-4 py-2 text-xs font-semibold flex items-center justify-between hover:bg-slate-50 ${
-                      selectedProgram === prog ? 'text-purple-600 font-bold bg-purple-50/50' : 'text-slate-700'
+                      selectedProgram === 'all' ? 'text-purple-600 font-bold bg-purple-50/50' : 'text-slate-700'
                     }`}
                   >
-                    <span className="truncate">{prog}</span>
-                    {selectedProgram === prog && <Check className="w-3.5 h-3.5 text-purple-600" />}
+                    <span>All Collections & Programs</span>
+                    {selectedProgram === 'all' && <Check className="w-3.5 h-3.5 text-purple-600" />}
                   </button>
-                ))}
+                  {filteredProgramsList.map(prog => (
+                    <button
+                      key={prog.id}
+                      onClick={() => { setSelectedProgram(prog.id); setIsProgramDropdownOpen(false); setProgramSearchQuery(''); }}
+                      className={`w-full text-left px-4 py-2 text-xs font-semibold flex items-center justify-between hover:bg-slate-50 ${
+                        selectedProgram === prog.id ? 'text-purple-600 font-bold bg-purple-50/50' : 'text-slate-700'
+                      }`}
+                    >
+                      <span className="truncate">{prog.name}</span>
+                      {selectedProgram === prog.id && <Check className="w-3.5 h-3.5 text-purple-600" />}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -355,7 +405,6 @@ export default function AllMinisteredSongsPage() {
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center">
             <CustomLoader />
-            <p className="text-xs font-bold text-slate-400 mt-3">Loading master library songs...</p>
           </div>
         ) : filteredSongs.length === 0 ? (
           <div className="bg-slate-50 rounded-3xl p-12 text-center space-y-3 border border-slate-100">
@@ -386,7 +435,7 @@ export default function AllMinisteredSongsPage() {
                 >
                   {/* Left Number Box (Purple 1, 2, 3, etc.) */}
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black flex items-center justify-center text-sm flex-shrink-0 shadow-xs">
-                    {idx + 1}
+                    {(currentPage - 1) * pageSize + idx + 1}
                   </div>
 
                   {/* Center Song Info */}
@@ -422,6 +471,41 @@ export default function AllMinisteredSongsPage() {
             })}
           </div>
         )}
+
+        {/* ── PAGINATION CONTROLS ── */}
+        {!loading && totalPages > 1 && (
+          <div className="pt-4 pb-4 flex items-center justify-between gap-3 border-t border-slate-100 mt-4">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 disabled:pointer-events-none rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-2xs"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </button>
+
+            <div className="text-center">
+              <span className="text-xs font-black text-slate-800 tracking-tight">
+                Page {currentPage} of {totalPages}
+              </span>
+              {totalSongs > 0 && (
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                  {totalSongs} total songs
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 disabled:pointer-events-none rounded-2xl text-xs font-bold transition-all active:scale-95 shadow-xs"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        </div>
       </div>
 
       {/* Song Detail & Stems Audio Player Modal */}

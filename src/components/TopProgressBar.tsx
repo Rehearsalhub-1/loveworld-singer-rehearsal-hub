@@ -26,7 +26,7 @@ export default function TopProgressBar() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[10000] h-[2.5px] bg-transparent overflow-hidden pointer-events-none">
-      <div className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-green-500 animate-progress origin-left w-full shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+      <div className="h-full bg-gradient-to-r from-purple-600 via-indigo-500 to-violet-500 animate-progress origin-left w-full shadow-[0_0_8px_rgba(147,51,234,0.6)]" />
       <style jsx>{`
         @keyframes progress {
           0% {

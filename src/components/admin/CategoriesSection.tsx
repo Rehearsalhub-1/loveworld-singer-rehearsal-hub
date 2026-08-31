@@ -376,13 +376,13 @@ export default function CategoriesSection(props: CategoriesSectionProps) {
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
               <span>Catalog Diversity</span>
-              <span className="font-bold text-purple-700">Repertoire</span>
+              <span className="font-bold text-purple-700">Songs</span>
             </div>
           </div>
 
           <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-fuchsia-300 transition-all">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-black text-fuchsia-600 uppercase tracking-widest">Repertoire Songs</span>
+              <span className="text-[11px] font-black text-fuchsia-600 uppercase tracking-widest">Songs</span>
               <div className="w-9 h-9 rounded-xl bg-fuchsia-50 text-fuchsia-700 flex items-center justify-center border border-fuchsia-100">
                 <Music className="w-4 h-4" />
               </div>

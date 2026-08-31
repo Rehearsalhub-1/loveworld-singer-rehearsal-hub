@@ -104,9 +104,9 @@ export default function RehearsalsPage() {
         description: 'Join active rehearsal sessions',
         icon: Users,
         href: '/pages/praise-night?category=ongoing',
-        gradient: 'from-emerald-600 via-green-600 to-lime-600',
-        iconBg: 'bg-emerald-100',
-        iconColor: 'text-emerald-600'
+        gradient: 'from-purple-600 via-indigo-600 to-violet-600',
+        iconBg: 'bg-purple-100',
+        iconColor: 'text-purple-600'
       }] : []),
       ...(!hiddenFeatures.hideWarmups && !hiddenFeatures.hideVocalWarmups ? [{
         id: 'vocal-warmups',

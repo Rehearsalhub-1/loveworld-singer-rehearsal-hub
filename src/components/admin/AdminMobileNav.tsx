@@ -38,7 +38,7 @@ const AdminMobileNav = React.memo(({
       case 'Categories':
       case 'Page Categories':
       case 'Submitted Songs':
-      case 'Master Library':
+      case 'All Ministered':
         return 'Pages';
       case 'Members':
       case 'Sub-Groups':

@@ -72,19 +72,21 @@ export default function KaraokeConfigSection() {
     else setLoading(true);
 
     try {
-      const masterSongs = await MasterLibraryService.getMasterSongs();
-      const merged: any[] = [
-        ...masterSongs.map((s: any) => ({ ...s, _source: 'Master' }))
-      ];
-      merged.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-      
-      // Update Cache
-      globalKaraokeSongsCache = {
-        data: merged,
-        timestamp: Date.now()
-      };
+      // Fetch all pages so every song (with or without saved LRC) appears in the list
+      let allFetched: any[] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const { songs, totalPages: tp } = await MasterLibraryService.getMasterSongs(page, 100);
+        allFetched = allFetched.concat(songs.map((s: any) => ({ ...s, _source: 'Master' })));
+        totalPages = tp || 1;
+        page++;
+      } while (page <= totalPages);
 
-      setAllSongs(merged);
+      allFetched.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+
+      globalKaraokeSongsCache = { data: allFetched, timestamp: Date.now() };
+      setAllSongs(allFetched);
     } catch (error) {
       console.error('[KaraokeConfigSection] Error loading songs:', error);
       showToast('error', 'Failed to load songs repertoire');
@@ -405,7 +407,7 @@ export default function KaraokeConfigSection() {
 
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl">
-              {filteredSongs.length.toLocaleString()} Repertoire Songs
+              {filteredSongs.length.toLocaleString()} Songs
             </span>
           </div>
         </div>
@@ -415,7 +417,7 @@ export default function KaraokeConfigSection() {
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Music className="w-4 h-4 text-purple-600" />
-              <h3 className="font-black text-sm text-slate-900">Songs Repertoire Catalog</h3>
+              <h3 className="font-black text-sm text-slate-900">Songs Catalog</h3>
             </div>
             <span className="text-[11px] font-bold text-slate-400">
               Showing {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, filteredSongs.length)} of {filteredSongs.length.toLocaleString()}
@@ -426,7 +428,7 @@ export default function KaraokeConfigSection() {
             <div className="py-20 text-center">
               <RefreshCw className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-3" />
               <p className="text-sm font-bold text-slate-600">Loading catalog songs...</p>
-              <p className="text-xs text-slate-400 mt-1">Fetching AudioLab and Master Library metadata</p>
+              <p className="text-xs text-slate-400 mt-1">Fetching song metadata</p>
             </div>
           ) : filteredSongs.length === 0 ? (
             <div className="py-20 text-center p-6">
@@ -437,7 +439,7 @@ export default function KaraokeConfigSection() {
                 {searchTerm ? `No songs matching "${searchTerm}"` : 'No songs found in catalog'}
               </h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-                {searchTerm ? 'Try searching with another keyword or writer name.' : 'Songs published in Master Library will automatically appear here for LRC syncing.'}
+                {searchTerm ? 'Try searching with another keyword or writer name.' : 'Songs published in All Ministered will automatically appear here for LRC syncing.'}
               </p>
             </div>
           ) : (

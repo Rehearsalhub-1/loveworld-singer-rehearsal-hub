@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import CustomLoader from '@/components/CustomLoader';
 
 /**
- * Admin Media — redirects to the full Media Library at /pages/media.
+ * Admin Media â€” redirects to the full Media Library at /pages/media.
  * The media library lives at that route with its full MediaContext provider.
  */
 export default function AdminMediaPage() {

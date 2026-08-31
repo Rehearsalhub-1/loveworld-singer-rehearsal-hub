@@ -479,7 +479,7 @@ export default function Members() {
     }
   };
 
-  // Pending HQ requests — members with pending_hq_approval flag in rawData
+  // Pending HQ requests â€” members with pending_hq_approval flag in rawData
   const pendingMembers = useMemo(() => {
     return members.filter(m => {
       const raw = (m as any).rawData || (m as any).raw_data || {};

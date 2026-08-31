@@ -130,7 +130,7 @@ export default function PageCategoriesSection(props: PageCategoriesSectionProps)
                 {pageCategories.length} Collections
               </span>
             </div>
-            <p className="text-xs font-medium text-slate-400 mt-0.5">Organize praise nights, rehearsal schedules, and program series</p>
+            <p className="text-xs font-medium text-slate-400 mt-0.5">Organize programs, rehearsal schedules, and series</p>
           </div>
         </div>
 
@@ -266,7 +266,7 @@ export default function PageCategoriesSection(props: PageCategoriesSectionProps)
                   </div>
 
                   <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-purple-600">
-                    <span>Manage Set & Repertoire</span>
+                    <span>Manage Programs</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </div>
@@ -280,7 +280,7 @@ export default function PageCategoriesSection(props: PageCategoriesSectionProps)
               </div>
               <h4 className="text-sm font-black text-slate-900 mb-1">No Programs in this Collection</h4>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Assign praise nights or schedules to this category from the Programs section.
+                Assign programs or schedules to this category from the Programs section.
               </p>
             </div>
           )}

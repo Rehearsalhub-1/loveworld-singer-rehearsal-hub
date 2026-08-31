@@ -86,7 +86,7 @@ export const MasterLibraryFilters: React.FC<MasterLibraryFiltersProps> = ({
             }`}
           >
             <Music className="w-3.5 h-3.5" />
-            <span>Active Repertoire</span>
+            <span>Active Songs</span>
             {stats?.activeSongs !== undefined && (
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
                 activeTab === 'active' ? 'bg-purple-100 text-purple-700' : 'bg-slate-200 text-slate-600'

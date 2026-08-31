@@ -50,6 +50,7 @@ export async function middleware(req: NextRequest) {
   const isProtectedRoute =
     pathname.startsWith('/pages') ||
     pathname.startsWith('/admin') ||
+    pathname.startsWith('/church-admin') ||
     pathname.startsWith('/boss') ||
     pathname.startsWith('/subgroup-admin') ||
     pathname.startsWith('/profile') ||
@@ -73,18 +74,38 @@ export async function middleware(req: NextRequest) {
   if (tokenCheck.ok) {
     const role = (tokenCheck.role || '').toLowerCase()
     const isHq = Boolean(tokenCheck.hasHqAccess || role === 'hq_admin' || role === 'admin' || role === 'super_admin' || role === 'boss')
-    const adminRoles = new Set([
-      'admin',
-      'hq_admin',
-      'super_admin',
-      'boss',
-      'zone_admin',
-      'zone_coordinator',
-      'subgroup_admin',
-      'subgroup_coordinator',
-      'church_coordinator',
-    ])
 
+    const churchRoles = new Set(['subgroup_admin', 'subgroup_coordinator', 'church_coordinator'])
+    const zoneAdminRoles = new Set(['admin', 'hq_admin', 'super_admin', 'boss', 'zone_admin', 'zone_coordinator'])
+    const isChurchRole = churchRoles.has(role)
+    const isZoneAdminRole = zoneAdminRoles.has(role) || isHq
+
+    // Church coordinators go to /church-admin, not /admin
+    if (pathname.startsWith('/admin') && isChurchRole && !isZoneAdminRole) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/church-admin'
+      return NextResponse.redirect(url)
+    }
+
+    // Zone/HQ admins cannot access /church-admin
+    if (pathname.startsWith('/church-admin') && isZoneAdminRole && !isChurchRole) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/admin/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    // Block unauthenticated or wrong-role from /church-admin
+    if (pathname.startsWith('/church-admin') && !isChurchRole && !isZoneAdminRole) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/home'
+      return NextResponse.redirect(url)
+    }
+
+    // Block non-admins from /admin
+    const adminRoles = new Set([
+      'admin', 'hq_admin', 'super_admin', 'boss',
+      'zone_admin', 'zone_coordinator',
+    ])
     if (pathname.startsWith('/admin') && !adminRoles.has(role) && !isHq) {
       const url = req.nextUrl.clone()
       url.pathname = '/home'

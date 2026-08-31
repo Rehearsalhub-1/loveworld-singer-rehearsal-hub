@@ -104,6 +104,13 @@ export default function PaymentDashboardSection() {
 
   useEffect(() => {
     loadSubscriptions();
+    // Hydrate payment config toggles from API on mount
+    apiClient.get<any>('/settings/payment_config').then((res) => {
+      if (res?.data) {
+        if (typeof res.data.hqEnabled === 'boolean') setHqEnabled(res.data.hqEnabled);
+        if (typeof res.data.zonalEnabled === 'boolean') setZonalEnabled(res.data.zonalEnabled);
+      }
+    }).catch(() => { /* non-blocking — UI keeps sensible defaults */ });
   }, []);
 
   // Filter subscriptions

@@ -20,7 +20,7 @@ import {
   Globe,
   Key
 } from 'lucide-react';
-import { ZONES, Zone, getZoneByInvitationCode, isHQGroup } from '@/config/zones';
+import { Zone, isHQGroup } from '@/config/zones';
 import { KingsChatAuthService } from '@/lib/kingschat-auth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
@@ -80,6 +80,13 @@ function AuthPageContent() {
   const [zoneSearchQuery, setZoneSearchQuery] = useState('');
   const [selectedZoneTab, setSelectedZoneTab] = useState<'all' | 'hq' | 'regional'>('all');
   const [useManualZoneCode, setUseManualZoneCode] = useState(false);
+  // Zones loaded from DB via API
+  const [allZones, setAllZones] = useState<Zone[]>([]);
+  useEffect(() => {
+    apiClient.get<{ success: boolean; data: Zone[] }>('/organizations')
+      .then((res) => { if (res.success && Array.isArray(res.data)) setAllZones(res.data); })
+      .catch(() => {});
+  }, []);
 
   // Forgot Password Modal State
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -102,31 +109,31 @@ function AuthPageContent() {
   const [zoneModalTab, setZoneModalTab] = useState<'browse' | 'code'>('browse');
   const [invitationCodeInput, setInvitationCodeInput] = useState('');
 
-  // Regional zones for "Browse" tab
+  // Regional zones for "Browse" tab — from DB
   const filteredRegionalZones = useMemo(() => {
-    const list = ZONES.filter((z) => z.region !== 'Headquarters' && !isHQGroup(z.id) && z.id !== 'zone-boss');
+    const list = allZones.filter((z) => !isHQGroup(z.id, z.isHq) && z.id !== 'zone-boss');
     if (!zoneSearchQuery.trim()) return list;
     const q = zoneSearchQuery.toLowerCase().trim();
     return list.filter(
       (z) =>
-        z.name.toLowerCase().includes(q) ||
-        z.region.toLowerCase().includes(q) ||
-        z.invitationCode.toLowerCase().includes(q) ||
-        z.slug.toLowerCase().includes(q)
+        (z.name || '').toLowerCase().includes(q) ||
+        (z.region || '').toLowerCase().includes(q) ||
+        (z.invitationCode || '').toLowerCase().includes(q)
     );
-  }, [zoneSearchQuery]);
+  }, [allZones, zoneSearchQuery]);
 
-  // Invitation code lookup for "Invitation Code" tab
+  // Invitation code lookup for "Invitation Code" tab — from DB
   const matchedInvitationZone = useMemo(() => {
     const code = invitationCodeInput.trim().toUpperCase();
     if (!code || code.length < 4) return null;
-    return getZoneByInvitationCode(code);
-  }, [invitationCodeInput]);
+    return allZones.find((z) => z.invitationCode?.toUpperCase() === code || z.code?.toUpperCase() === code) || null;
+  }, [allZones, invitationCodeInput]);
 
   const selectedZoneObj = useMemo(() => {
     if (!formData.zoneCode) return null;
-    return getZoneByInvitationCode(formData.zoneCode);
-  }, [formData.zoneCode]);
+    const code = formData.zoneCode.trim().toUpperCase();
+    return allZones.find((z) => z.invitationCode?.toUpperCase() === code || z.code?.toUpperCase() === code) || null;
+  }, [allZones, formData.zoneCode]);
 
   // 1-Tap KingsChat Authentication
   const handleKingsChatLogin = async () => {
@@ -809,7 +816,7 @@ function AuthPageContent() {
                         key={z.id}
                         type="button"
                         onClick={() => {
-                          setFormData({ ...formData, zoneCode: z.invitationCode });
+                          setFormData({ ...formData, zoneCode: z.invitationCode || '' });
                           setIsZoneModalOpen(false);
                           setZoneSearchQuery('');
                         }}
@@ -868,7 +875,7 @@ function AuthPageContent() {
                     <button
                       type="button"
                       onClick={() => {
-                        setFormData({ ...formData, zoneCode: matchedInvitationZone.invitationCode });
+                        setFormData({ ...formData, zoneCode: matchedInvitationZone.invitationCode || '' });
                         setIsZoneModalOpen(false);
                         setInvitationCodeInput('');
                       }}

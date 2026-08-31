@@ -63,13 +63,34 @@ export function ChatWindow({
 
   const formatLastSeen = (lastSeen: any) => {
     if (!lastSeen) return ''
-    const date = new Date(lastSeen.seconds * 1000)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    if (diff < MINUTE_MS) return 'just now'
-    if (diff < HOUR_MS) return `${Math.floor(diff / MINUTE_MS)}m ago`
-    if (diff < DAY_MS) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    return date.toLocaleDateString()
+    try {
+      let date: Date | null = null
+      if (lastSeen instanceof Date) {
+        date = lastSeen
+      } else if (typeof lastSeen === 'object') {
+        const sec = lastSeen._seconds ?? lastSeen.seconds
+        if (sec !== undefined && sec !== null) {
+          date = new Date(Number(sec) * 1000)
+        } else if (typeof lastSeen.toDate === 'function') {
+          date = lastSeen.toDate()
+        }
+      } else if (typeof lastSeen === 'number') {
+        date = new Date(lastSeen > 1e11 ? lastSeen : lastSeen * 1000)
+      } else if (typeof lastSeen === 'string') {
+        const parsed = new Date(lastSeen)
+        if (!isNaN(parsed.getTime())) date = parsed
+      }
+
+      if (!date || isNaN(date.getTime())) return 'recently'
+      const now = new Date()
+      const diff = now.getTime() - date.getTime()
+      if (diff < MINUTE_MS) return 'just now'
+      if (diff < HOUR_MS) return `${Math.max(1, Math.floor(diff / MINUTE_MS))}m ago`
+      if (diff < DAY_MS) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      return date.toLocaleDateString()
+    } catch {
+      return 'recently'
+    }
   }
   const [showScrollBottom, setShowScrollBottom] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)

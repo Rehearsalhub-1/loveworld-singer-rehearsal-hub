@@ -264,7 +264,7 @@ export default function ActivityLogsPage() {
               <option value="pages">Pages</option>
               <option value="categories">Categories</option>
               <option value="subgroups">Subgroups</option>
-              <option value="master_library">Master Library</option>
+              <option value="master_library">All Ministered</option>
               <option value="media">Media</option>
             </select>
           </div>

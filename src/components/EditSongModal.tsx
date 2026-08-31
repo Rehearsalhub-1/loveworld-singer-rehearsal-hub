@@ -155,6 +155,7 @@ export default function EditSongModal({
 
   const loadHistoryEntries = useCallback(async () => {
     const sid = song?.id || (song as any)?.firebaseId;
+    const pid = (song as any)?.programId || (song as any)?.program_id || (song as any)?.praiseNightId || (song as any)?.praise_night_id;
     if (!sid && !song?.title) {
       setHistoryEntries([]);
       return;
@@ -163,6 +164,7 @@ export default function EditSongModal({
       const params = new URLSearchParams();
       if (sid) params.append('songId', String(sid));
       if (song?.title) params.append('title', song.title);
+      if (pid) params.append('programId', String(pid));
 
       const res = await apiClient.get<{ success: boolean; data: any[] }>(
         `/songs/history?${params.toString()}`
@@ -176,7 +178,7 @@ export default function EditSongModal({
       console.error('Error loading history entries:', err);
       setHistoryEntries([]);
     }
-  }, [song?.id, (song as any)?.firebaseId, song?.title]);
+  }, [song?.id, (song as any)?.firebaseId, song?.title, (song as any)?.programId, (song as any)?.program_id, (song as any)?.praiseNightId, (song as any)?.praise_night_id]);
 
   useEffect(() => {
     if (isOpen && (song?.id || (song as any)?.firebaseId || song?.title)) {
@@ -232,8 +234,10 @@ export default function EditSongModal({
           break;
       }
 
+      const pid = (song as any)?.programId || (song as any)?.program_id || (song as any)?.praiseNightId || (song as any)?.praise_night_id || null;
       const res = await apiClient.post<{ success: boolean; data: any }>('/songs/history', {
         songId: song.id,
+        programId: pid,
         type: historyType,
         title: historyTitle,
         new_value: currentContent,
@@ -418,7 +422,8 @@ export default function EditSongModal({
   const handleUpdate = async () => {
     if (!songTitle.trim()) return;
     const selectedPraiseNight = praiseNightCategories.find(pn => pn.name === songPraiseNight);
-    if (!selectedPraiseNight) {
+    // Praise night is optional — only validate when a name is typed but no match found
+    if (songPraiseNight && !selectedPraiseNight) {
       window.dispatchEvent(new CustomEvent('showToast', { detail: { message: 'Please select a valid Praise Night', type: 'warning' } }));
       return;
     }
@@ -438,7 +443,7 @@ export default function EditSongModal({
       status: songStatus || 'unheard',
       category: songCategory,
       categories: songCategories,
-      praiseNightId: selectedPraiseNight.id,
+      praiseNightId: selectedPraiseNight?.id || song?.praiseNightId || '',
       lyrics: songLyrics,
       leadSinger: songLeadSinger,
       writer: songWriter,

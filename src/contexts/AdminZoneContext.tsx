@@ -47,11 +47,10 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   const {
     activeOrganization,
-    activeSubgroup,
     accessibleOrganizations,
     accessibleSubgroups,
+    userMemberships,
     switchOrganization,
-    switchSubgroup,
     capabilities,
     isSuperAdmin,
   } = useOrganizationStore();
@@ -67,9 +66,14 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   );
 
   const selectedZoneId = activeOrganization?.id || 'zone-001';
-  const selectedChurchId = activeSubgroup?.id || null;
   const isGlobalView = Boolean(activeOrganization?.isHq);
-  const isChurchScope = Boolean(activeSubgroup?.id);
+
+  // Admin church scope is LOCAL to admin context — does NOT write to global org store
+  // This prevents the singer portal from seeing admin church switches
+  const [adminChurchId, setAdminChurchId] = useState<string | null>(null);
+
+  const selectedChurchId = adminChurchId;
+  const isChurchScope = Boolean(adminChurchId);
 
   const selectedZone = useMemo(() => {
     if (!activeOrganization) return null;
@@ -84,14 +88,16 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   }, [activeOrganization]);
 
   const selectedChurch = useMemo(() => {
-    if (!activeSubgroup) return null;
+    if (!adminChurchId) return null;
+    const sg = accessibleSubgroups.find(s => s.id === adminChurchId);
+    if (!sg) return null;
     return {
-      id: activeSubgroup.id,
-      name: activeSubgroup.name,
-      zoneId: activeSubgroup.organizationId || activeOrganization?.id,
-      description: activeSubgroup.description,
+      id: sg.id,
+      name: sg.name,
+      zoneId: sg.organizationId || activeOrganization?.id,
+      description: sg.description,
     } as ChurchSubGroup;
-  }, [activeSubgroup, activeOrganization]);
+  }, [adminChurchId, accessibleSubgroups, activeOrganization]);
 
   const availableZones = useMemo(() => {
     return accessibleOrganizations.map((org) => ({
@@ -105,13 +111,22 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   }, [accessibleOrganizations]);
 
   const userChurches = useMemo(() => {
-    return accessibleSubgroups.map((sg) => ({
+    // Only show churches where the user has an actual membership (subgroupId set)
+    // Admins manage ALL churches but only SEE the ones they're personally a member/coordinator of
+    const userSubgroupIds = new Set(
+      userMemberships
+        .filter((m) => m.subgroupId)
+        .map((m) => m.subgroupId!)
+    );
+    // Only show churches the user personally belongs to — no fallback to all
+    const subgroupsToShow = accessibleSubgroups.filter((sg) => userSubgroupIds.has(sg.id));
+    return subgroupsToShow.map((sg) => ({
       id: sg.id,
       name: sg.name,
       zoneId: sg.organizationId || activeOrganization?.id,
       description: sg.description,
     })) as ChurchSubGroup[];
-  }, [accessibleSubgroups, activeOrganization]);
+  }, [accessibleSubgroups, userMemberships, activeOrganization]);
 
   const setSelectedZoneId = useCallback((zoneId: string) => {
     // Zone switching is disabled for non-HQ admins — they are locked to their org.
@@ -129,8 +144,16 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   }, [accessibleOrganizations, switchOrganization, isHQAdmin]);
 
   const setSelectedChurchId = useCallback((churchId: string | null) => {
-    switchSubgroup(churchId);
-  }, [switchSubgroup]);
+    setAdminChurchId(churchId);
+    // Update API client headers for admin requests without touching global store
+    apiClient.setActiveScope({
+      organizationId: activeOrganization?.id || null,
+      subgroupId: churchId,
+      zoneId: activeOrganization?.id || null,
+      churchId: churchId,
+      scope: churchId ? 'church' : (activeOrganization?.isHq ? 'global' : 'zone'),
+    });
+  }, [activeOrganization?.id, activeOrganization?.isHq]);
 
   const refreshUserChurches = useCallback(async () => {
     useOrganizationStore.getState().refreshOrganizations();
@@ -139,16 +162,17 @@ export function AdminZoneProvider({ children }: { children: React.ReactNode }) {
   // The org this admin is locked to as an admin (not just as a member)
   const adminLockedOrgId = activeOrganization?.id || null;
 
-  // Keep the API client tenant headers in sync with the active multi-tenant context
+  // Keep the API client org-level headers in sync when org changes.
+  // Church/subgroup scope is managed locally by setSelectedChurchId — not here.
   useEffect(() => {
     apiClient.setActiveScope({
       organizationId: activeOrganization?.id || null,
-      subgroupId: activeSubgroup?.id || null,
       zoneId: activeOrganization?.id || null,
-      churchId: activeSubgroup?.id || null,
-      scope: activeSubgroup?.id ? 'church' : (activeOrganization?.isHq ? 'global' : 'zone'),
+      subgroupId: adminChurchId,
+      churchId: adminChurchId,
+      scope: adminChurchId ? 'church' : (activeOrganization?.isHq ? 'global' : 'zone'),
     });
-  }, [activeOrganization?.id, activeOrganization?.isHq, activeSubgroup?.id]);
+  }, [activeOrganization?.id, activeOrganization?.isHq, adminChurchId]);
 
   const zoneScopeLabel = isChurchScope
     ? (selectedChurch?.name || 'Church Scope')

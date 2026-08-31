@@ -195,8 +195,9 @@ export default function PagesSection(props: PagesSectionProps) {
     if (Array.isArray((selectedPage as any).songs) && (selectedPage as any).songs.length > 0) {
       return (selectedPage as any).songs;
     }
-    if (allSongs.length > 0) {
-      return allSongs.filter(song => {
+    const safeSongs = Array.isArray(allSongs) ? allSongs : [];
+    if (safeSongs.length > 0) {
+      return safeSongs.filter(song => {
         const songPageId = song.praiseNightId || (song as any).praisenightid || (song as any).praisenight_id || (song as any).programId || (song as any).pageId;
         return !songPageId || songPageId === selectedPage.id || songPageId === selectedPage.id.toString();
       });
@@ -392,7 +393,7 @@ export default function PagesSection(props: PagesSectionProps) {
             const isOngoing = page.category === 'ongoing';
             const isPreRehearsal = page.category === 'pre-rehearsal';
 
-            const thisPageSongs = allSongs.filter(s => {
+            const thisPageSongs = (Array.isArray(allSongs) ? allSongs : []).filter(s => {
               const sPid = s.praiseNightId || (s as any).praisenightid || (s as any).praisenight_id || (s as any).pageId;
               return sPid === page.id || sPid === page.id.toString();
             });

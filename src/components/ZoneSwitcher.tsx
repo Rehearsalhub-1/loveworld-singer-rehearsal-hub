@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useZone } from '@/hooks/useZone'
 import { useAuth } from '@/stores/authStore'
-import { ZONES, Zone, isHQGroup } from '@/config/zones'
+import { Zone, isHQGroup } from '@/config/zones'
+import { apiClient } from '@/lib/api-client'
 import { ChevronDown, Check, Users, Search, Plus, Sparkles, Building, Shield } from 'lucide-react'
 import CustomLoader from './CustomLoader'
 
@@ -16,6 +17,12 @@ export default function ZoneSwitcher() {
   const [joinCode, setJoinCode] = useState('')
   const [isJoining, setIsJoining] = useState(false)
   const [joinMessage, setJoinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [allZones, setAllZones] = useState<Zone[]>([])
+  useEffect(() => {
+    apiClient.get<{ success: boolean; data: Zone[] }>('/organizations')
+      .then((res) => { if (res.success && Array.isArray(res.data)) setAllZones(res.data); })
+      .catch(() => {});
+  }, []);
 
   // Zones to display:
   // For Super Admins / HQ Admins -> all ZONES
@@ -23,10 +30,10 @@ export default function ZoneSwitcher() {
   const displayedZones = useMemo(() => {
     const hasSpecialAccess = isSuperAdmin || isHQAdmin || profile?.hasHqAccess || profile?.has_hq_access
     if (hasSpecialAccess) {
-      return ZONES
+      return allZones.length > 0 ? allZones : userZones;
     }
-    return userZones.length > 0 ? userZones : (currentZone ? [currentZone] : ZONES.slice(0, 1))
-  }, [isSuperAdmin, isHQAdmin, profile, userZones, currentZone])
+    return userZones.length > 0 ? userZones : (currentZone ? [currentZone] : [])
+  }, [isSuperAdmin, isHQAdmin, profile, userZones, currentZone, allZones])
 
   const filteredZones = useMemo(() => {
     if (!searchQuery.trim()) return displayedZones
@@ -251,7 +258,7 @@ export default function ZoneSwitcher() {
                             >
                               <div
                                 className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
-                                style={{ backgroundColor: zone.themeColor || '#10B981' }}
+                                style={{ backgroundColor: zone.themeColor || '#9333EA' }}
                               />
                               <div className="flex-1 min-w-0">
                                 <p className={`text-xs truncate ${isSelected ? 'text-purple-700 font-bold' : 'text-gray-900'}`}>

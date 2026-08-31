@@ -34,18 +34,36 @@ export interface MasterProgram {
 }
 
 export const MasterLibraryService = {
-  getMasterSongs: async (): Promise<MasterSong[]> => {
+  getMasterSongs: async (page = 1, limit = 50, search = ''): Promise<{ songs: MasterSong[]; total: number; totalPages: number }> => {
     try {
-      const res = await apiClient.get<{ success?: boolean; data?: MasterSong[] }>('/songs/master');
-      if (res && Array.isArray(res.data)) {
-        return res.data;
-      }
-      if (Array.isArray(res)) {
-        return res as MasterSong[];
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.set('search', search);
+      const res = await apiClient.get<{ success?: boolean; data?: MasterSong[]; total?: number; totalPages?: number }>(`/songs/master?${params}`);
+      const songs = Array.isArray(res?.data) ? res.data : [];
+      return { songs, total: res?.total || songs.length, totalPages: res?.totalPages || 1 };
+    } catch (err) {
+      console.error('Failed to fetch ministered songs:', err);
+      return { songs: [], total: 0, totalPages: 1 };
+    }
+  },
+  getPrograms: async (): Promise<MasterProgram[]> => {
+    try {
+      const progRes = await apiClient.get<{ success?: boolean; data?: MasterProgram[] }>('/programs');
+      if (progRes && Array.isArray(progRes.data)) {
+        const HQ_ZONE_IDS = new Set([
+          'zone-001', 'zone-002', 'zone-003', 'zone-004', 'zone-005',
+          'zone-orchestra', 'zone-president', 'zone-president-2',
+          'zone-director', 'zone-oftp', 'zone-oftd',
+          'zone-national', 'zone-international', 'zone-sa-1',
+        ]);
+        return progRes.data.filter((p: any) => {
+          const orgId = p.organizationId || p.zoneId || p.zone_id || (p.rawData && (p.rawData.zoneId || p.rawData.zone_id));
+          return !orgId || HQ_ZONE_IDS.has(orgId);
+        });
       }
       return [];
     } catch (err) {
-      console.error('Failed to fetch ministered songs:', err);
+      console.error('Failed to fetch master programs:', err);
       return [];
     }
   },
@@ -68,6 +86,10 @@ export const MasterLibraryService = {
 
 export const useMasterLibrary = (isHQAdmin: boolean = false) => {
   const [masterSongs, setMasterSongs] = useState<MasterSong[]>([]);
+  const [totalSongsCount, setTotalSongsCount] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverPage, setServerPage] = useState(1);
+  const serverPageSize = 50;
   const [programs, setPrograms] = useState<MasterProgram[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,18 +108,12 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showPublishModal, setShowPublishModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCreateProgramModal, setShowCreateProgramModal] = useState(false);
   const [showOrderProgramsModal, setShowOrderProgramsModal] = useState(false);
   const [selectedSong, setSelectedSong] = useState<MasterSong | null>(null);
   const [isAssigningToProgram, setIsAssigningToProgram] = useState(false);
   const [songsToAssign, setSongsToAssign] = useState<MasterSong[]>([]);
-
-  // Import from Internal State
-  const [availableForPublish, setAvailableForPublish] = useState<any[]>([]);
-  const [selectedForPublish, setSelectedForPublish] = useState<string[]>([]);
-  const [publishing, setPublishing] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -107,41 +123,30 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const songsData = await MasterLibraryService.getMasterSongs();
+      const { songs: songsData, total, totalPages: tp } = await MasterLibraryService.getMasterSongs(serverPage, serverPageSize, searchTerm);
       setMasterSongs(songsData);
+      setTotalSongsCount(total);
+      setServerTotalPages(tp);
 
-      // Fetch programs
+      // Fetch HQ master programs only — these are collections/groupings for master songs
       try {
-        const progRes = await apiClient.get<{ success?: boolean; data?: MasterProgram[] }>('/programs');
-        if (progRes && Array.isArray(progRes.data)) {
-          setPrograms(progRes.data);
-        }
+        const hqPrograms = await MasterLibraryService.getPrograms();
+        setPrograms(hqPrograms);
       } catch {
         // non-blocking
       }
 
-      // Fetch internal songs for Import from Internal
-      try {
-        const intRes = await apiClient.get<{ success?: boolean; data?: any[] }>('/songs');
-        if (intRes && Array.isArray(intRes.data)) {
-          setAvailableForPublish(intRes.data);
-        } else if (Array.isArray(intRes)) {
-          setAvailableForPublish(intRes);
-        }
-      } catch {
-        // non-blocking
-      }
     } catch (err: any) {
       console.error('Error loading master library:', err);
       setError(err?.message || 'Failed to load master library');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [serverPage, searchTerm]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, serverPage, searchTerm]);
 
   // Derived Lead Singers list
   const leadSingers = useMemo(() => {
@@ -201,14 +206,14 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
     const hiddenCount = masterSongs.filter(s => s.isHQOnly || s.isHqOnly || s.status === 'hidden').length;
 
     return {
-      totalSongs: masterSongs.length,
+      totalSongs: totalSongsCount || masterSongs.length,
       activeSongs: activeCount,
       historySongs: historyCount,
       hiddenSongs: hiddenCount,
       totalImports,
       mostImported: sortedByImports.slice(0, 5)
     };
-  }, [masterSongs]);
+  }, [masterSongs, totalSongsCount]);
 
   // Hide / Unhide Action
   const handleToggleHideSong = async (id: string, currentHidden: boolean) => {
@@ -285,31 +290,6 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
   const onSongCreated = (newSong: MasterSong) => {
     setMasterSongs(prev => [newSong, ...prev.filter(s => s.id !== newSong.id)]);
     loadData(true); // silent background re-sync
-  };
-
-  // Publish / Import from Internal to Master
-  const handlePublish = async () => {
-    if (selectedForPublish.length === 0) return;
-    setPublishing(true);
-    try {
-      const selectedSongs = availableForPublish.filter(s => selectedForPublish.includes(s.id));
-      for (const s of selectedSongs) {
-        const { id, zoneId, praiseNightId, createdAt, updatedAt, ...rest } = s;
-        await MasterLibraryService.createMasterSong({
-          ...rest,
-          sourceType: 'imported_from_internal',
-          status: 'active',
-          isHqOnly: false,
-        });
-      }
-      setShowPublishModal(false);
-      setSelectedForPublish([]);
-      await loadData(true);
-    } catch (e) {
-      console.error('Failed to import internal songs to master:', e);
-    } finally {
-      setPublishing(false);
-    }
   };
 
   // Actions
@@ -398,7 +378,7 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
     stats,
     canManage: !!isHQAdmin,
     searchTerm,
-    setSearchTerm: (term: string) => { setSearchTerm(term); setCurrentPage(1); },
+    setSearchTerm: (term: string) => { setSearchTerm(term); setCurrentPage(1); setServerPage(1); },
     sortOrder,
     setSortOrder,
     selectedLeadSinger,
@@ -413,13 +393,17 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
     selectedSongIds,
     setSelectedSongIds,
     activeTab,
-    setActiveTab: (tab: 'active' | 'history' | 'hidden' | 'all') => { setActiveTab(tab); setCurrentPage(1); },
+    setActiveTab: (tab: 'active' | 'history' | 'hidden' | 'all') => { setActiveTab(tab); setCurrentPage(1); setServerPage(1); },
     currentPage,
     totalPages,
     setCurrentPage,
     isLoadingMore: false,
     hasMoreMasterSongs: false,
     loadMoreMasterSongs: async () => {},
+    serverPage,
+    setServerPage: (p: number) => { setServerPage(p); },
+    serverTotalPages,
+    totalSongsCount,
     isAssigningToProgram,
     setIsAssigningToProgram,
     songsToAssign,
@@ -436,8 +420,6 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
     loadData,
     showCreateModal,
     setShowCreateModal,
-    showPublishModal,
-    setShowPublishModal,
     showEditModal,
     setShowEditModal,
     showCreateProgramModal,
@@ -450,11 +432,6 @@ export const useMasterLibrary = (isHQAdmin: boolean = false) => {
     setShowImportModal,
     selectedSong,
     setSelectedSong,
-    availableForPublish,
-    selectedForPublish,
-    setSelectedForPublish,
-    handlePublish,
-    publishing,
     hasMoreInternalSongs: false,
     loadMoreInternalSongs: async () => {},
     zonePraiseNights: [] as any[],

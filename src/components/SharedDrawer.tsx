@@ -4,7 +4,6 @@ import React, { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { X, LogOut, AlertCircle } from 'lucide-react'
-import { useZone } from '@/hooks/useZone'
 import { useAuth } from '@/hooks/useAuth'
 
 type DrawerItem = {
@@ -31,18 +30,17 @@ type SharedDrawerProps = {
 
 export default function SharedDrawer({ open, onClose, title = 'Menu', items, customSections = [], fixedOnDesktop = false }: SharedDrawerProps) {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
-  // Use ref instead of state to prevent callback from being lost on re-render
   const logoutCallbackRef = useRef<(() => void) | null>(null)
   const router = useRouter()
-  const { currentZone } = useZone()
   const { signOut } = useAuth()
 
-  // Get zone colors
+  // Standardized Royal Purple theme
   const zoneColors = {
-    primary: currentZone?.themeColor || '#16a34a',
-    secondary: currentZone?.themeColor || '#15803d',
-    accent: currentZone?.themeColor || '#22c55e'
+    primary: '#9333ea',
+    secondary: '#7c3aed',
+    accent: '#a855f7'
   }
+
   // Render drawer content
   const renderDrawerContent = () => (
     <>
@@ -69,13 +67,9 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
         {(items || []).map((item, index) => {
           const MenuItem: any = item.onClick ? 'button' : Link
 
-          // Special handling for logout and refresh
           const isLogout = item.title.toLowerCase() === 'logout'
           const isRefresh = item.title.toLowerCase() === 'refresh app'
 
-          // Debug logging for refresh button
-          if (isRefresh) {
-          }
           const commonProps = item.onClick
             ? {
               onClick: (e: React.MouseEvent) => {
@@ -83,17 +77,14 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
                 e.stopPropagation()
 
                 if (isLogout) {
-                  // Store the callback in ref (won't be lost on re-render)
                   logoutCallbackRef.current = item.onClick || null
                   setShowLogoutModal(true)
                 } else if (isRefresh) {
-                  // Execute immediately for refresh
                   if (item.onClick) {
                     item.onClick()
                   }
                   onClose()
                 } else {
-                  // Execute immediately for other items
                   if (item.onClick) {
                     item.onClick()
                   }
@@ -104,17 +95,11 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
             : {
               href: item.href || '#',
               onClick: (e: any) => {
-
-                // If href is '#', prevent navigation
                 if (item.href === '#') {
                   e.preventDefault();
                   return;
                 }
-
-                // Close drawer first
                 onClose();
-
-                // Use router for navigation
                 if (item.href && item.href !== '#') {
                   router.push(item.href);
                 }
@@ -128,7 +113,7 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
               className={`flex items-center justify-between px-4 py-2.5 hover:bg-gray-50/80 transition-all duration-200 active:bg-gray-100/80 w-full text-left group ${isLogout
                   ? 'text-red-600 hover:bg-red-50/80 active:bg-red-100/80'
                   : isRefresh
-                    ? 'text-blue-600 hover:bg-blue-50/80 active:bg-blue-100/80'
+                    ? 'text-purple-600 hover:bg-purple-50/80 active:bg-purple-100/80'
                     : 'text-gray-800'
                 }`}
             >
@@ -137,7 +122,7 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
                   className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${isLogout
                       ? 'bg-red-100/80 group-hover:bg-red-200/80'
                       : isRefresh
-                        ? 'bg-blue-100/80 group-hover:bg-blue-200/80'
+                        ? 'bg-purple-100/80 group-hover:bg-purple-200/80'
                         : 'group-hover:opacity-80'
                     }`}
                   style={!isLogout && !isRefresh ? {
@@ -145,7 +130,7 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
                   } : {}}
                 >
                   <item.icon
-                    className={`w-4 h-4 transition-colors duration-200 ${isLogout ? 'text-red-600' : isRefresh ? 'text-blue-600' : ''
+                    className={`w-4 h-4 transition-colors duration-200 ${isLogout ? 'text-red-600' : isRefresh ? 'text-purple-600' : ''
                       }`}
                     style={!isLogout && !isRefresh ? {
                       color: zoneColors.primary
@@ -277,12 +262,10 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
                   setShowLogoutModal(false)
                   onClose()
 
-                  // Execute logout directly using signOut from useAuth
                   try {
                     await signOut()
                   } catch (error) {
- console.error(' SignOut error:', error);
-                    // Fallback: try the stored callback
+                    console.error('SignOut error:', error);
                     if (logoutCallbackRef.current) {
                       logoutCallbackRef.current()
                     }
@@ -306,6 +289,3 @@ export default function SharedDrawer({ open, onClose, title = 'Menu', items, cus
     </>
   )
 }
-
-
-

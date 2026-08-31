@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ScreenHeader } from '@/components/ScreenHeader'
 import { useAuth } from '@/hooks/useAuth'
 import { useZone } from '@/hooks/useZone'
 import { ArrowLeft, Users, Check, Loader2, ChevronDown, Search, Building } from 'lucide-react'
-import { ZONES, getZoneByInvitationCode } from '@/config/zones'
+import { Zone } from '@/config/zones'
+import { apiClient } from '@/lib/api-client'
 
 export default function JoinZonePage() {
   const router = useRouter()
@@ -21,20 +22,28 @@ export default function JoinZonePage() {
   const [isJoining, setIsJoining] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [allZones, setAllZones] = useState<Zone[]>([])
+  useEffect(() => {
+    apiClient.get<{ success: boolean; data: Zone[] }>('/organizations')
+      .then((res) => { if (res.success && Array.isArray(res.data)) setAllZones(res.data); })
+      .catch(() => {});
+  }, []);
 
-  // Validate zone code as user types
-  const handleZoneCodeChange = async (code: string) => {
-    setZoneCode(code.toUpperCase())
-    setError('')
-    setZoneName(null)
-
-    if (code.length >= 6) {
-      const { getZoneByInvitationCode } = await import('@/config/zones')
-      const zone = getZoneByInvitationCode(code.toUpperCase())
+  const handleZoneCodeChange = (code: string) => {
+    const clean = code.toUpperCase();
+    setZoneCode(clean);
+    setError('');
+    setZoneName(null);
+    if (clean.length >= 4) {
+      const zone = allZones.find(
+        z => (z.invitationCode || '').toUpperCase() === clean ||
+             (z.code || '').toUpperCase() === clean ||
+             z.id.toUpperCase() === clean
+      );
       if (zone) {
-        setZoneName(zone.name)
-      } else {
-        setError('Invalid zone code')
+        setZoneName(zone.name || zone.id);
+      } else if (clean.length >= 6) {
+        setError('Invalid zone code');
       }
     }
   }
@@ -179,12 +188,12 @@ export default function JoinZonePage() {
                         </div>
 
                         <div className="max-h-60 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
-                          {ZONES.filter(z => {
+                          {allZones.filter(z => {
                             if (!zoneSearchQuery.trim()) return true;
                             const q = zoneSearchQuery.toLowerCase().trim();
-                            return z.name.toLowerCase().includes(q) ||
-                              (z.region && z.region.toLowerCase().includes(q)) ||
-                              (z.invitationCode && z.invitationCode.toLowerCase().includes(q));
+                            return (z.name || '').toLowerCase().includes(q) ||
+                              ((z.region || '').toLowerCase().includes(q)) ||
+                              ((z.invitationCode || '').toLowerCase().includes(q));
                           }).map(z => {
                             const isSelected = zoneCode === z.invitationCode;
                             return (
@@ -192,7 +201,7 @@ export default function JoinZonePage() {
                                 key={z.id}
                                 type="button"
                                 onClick={() => {
-                                  handleZoneCodeChange(z.invitationCode);
+                                  handleZoneCodeChange(z.invitationCode || '');
                                   setIsZoneDropdownOpen(false);
                                   setZoneSearchQuery('');
                                 }}
